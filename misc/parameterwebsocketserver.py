@@ -5,7 +5,8 @@ import json
 import numpy as np
 import tensorflow as tf
 from threading import Lock
-
+import tensorsparkmodel
+import pickle
 
 class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
    def open(self):
@@ -16,21 +17,26 @@ class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
 
    def on_message(self, message):
       message = json.loads(message)
-      if message['type'] == 'client_requests_model':
+      if message['type'] == 'client_requests_parameters':
          lock.acquire()
-         print 'sending model'
-         self.write_message(model)
+         parameters = model.get_parameters()
          lock.release()
+         print 'sending %d parameters ' % len(parameters)
+         parameters = pickle.dumps(parameters) #, ensure_ascii=False, encoding='latin-1')
+         self.write_message(parameters)
       elif message['type'] == 'client_gives_gradient':
+         # deserialize!
+         gradient = pickle.loads(message['gradient'])
+         print 'received gradient'
          lock.acquire()
-         #self.model.get_optimizer().apply_gradients(message.gradient)
-         print 'received gradient %s' % message['gradient']
+         self.model.apply_gradients(gradient)
          lock.release()
+         print 'applied gradient'
       else:
          print 'Unknown message type %s' % message['type']
 
 
-model = 'model'
+model = tensorsparkmodel.TensorSparkModel()
 lock = Lock()
 application = tornado.web.Application([
     (r"/", ParameterWebsocketServer),
