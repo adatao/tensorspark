@@ -22,14 +22,14 @@ class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
          parameters = model.get_parameters()
          lock.release()
          print 'sending %d parameters ' % len(parameters)
-         parameters = pickle.dumps(parameters) #, ensure_ascii=False, encoding='latin-1')
+         parameters = pickle.dumps(parameters)
          self.write_message(parameters)
       elif message['type'] == 'client_gives_gradient':
          # deserialize!
          gradient = pickle.loads(message['gradient'])
          print 'received gradient'
          lock.acquire()
-         self.model.apply_gradients(gradient)
+         model.apply_gradients( gradient)
          lock.release()
          print 'applied gradient'
       else:

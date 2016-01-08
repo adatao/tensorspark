@@ -13,10 +13,10 @@ class TensorSparkWorker():
 
    def run(self):
       websock = websocket.create_connection('ws://localhost:55555')
-      iterations_per_push = 100
-      iterations_per_pull = 100
-      for iteration in range(20000):
-         if iteration % iterations_per_pull + 1 == 0:
+      iterations_per_push = 1
+      iterations_per_pull = 1
+      for iteration in range(20):
+         if (iteration + 1) % iterations_per_pull == 0:
             request_model_message = {'type':'client_requests_parameters'}
             websock.send(json.dumps(request_model_message))
             print 'requesting parameters'
@@ -29,13 +29,13 @@ class TensorSparkWorker():
 
          self.model.train()
 
-         if iteration % iterations_per_push == 0:
+         if (iteration + 2) % iterations_per_push == 0:
             print 'pushing'
             gradient = pickle.dumps(self.model.get_gradients())
-            print 'got gradients'
             gradient_update_message = {'type':'client_gives_gradient', 'gradient':gradient}
             websock.send(json.dumps(gradient_update_message))
-
+            print 'pushed gradients'
+      self.model.test()
 
 worker = TensorSparkWorker()
 worker.run()

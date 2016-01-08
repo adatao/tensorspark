@@ -44,20 +44,31 @@ class TensorSparkModel():
       y_conv=tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
       self.variables = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
-      self.reset_gradients()
       self.loss = -tf.reduce_sum(self.y_ * tf.log(y_conv))
       self.optimizer = tf.train.AdamOptimizer(1e-4)
       self.correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(self.y_,1))
       self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, "float"))
-      self.compute_gradients = self.optimizer.compute_gradients(self.loss, self.variables)
-      self.gradient_holders = [(g[0],self.gradients[i]) for i, g in enumerate(self.compute_gradients)]
-      self.apply_gradients = self.optimizer.apply_gradients(self.gradient_holders)
+      self.compute_gradients = self.optimizer.compute_gradients(self.loss) #, self.variables)
+      self.reset_gradients()
+#      for var in self.variables:
+#         print var.get_shape()
+#      print 
+#      for grad in self.compute_gradients:
+#         print grad[0].eval().get_shape()
+#      print [var[0].get_shape() for var in self.compute_gradients]
+#      self.gradient_holders = [(g[0],tf.Variable(tf.zeros(g[1].get_shape()))) for i, g in enumerate(self.compute_gradients)]
+#      self.apply_gradients = self.optimizer.apply_gradients(self.gradient_holders)
       self.session.run(tf.initialize_all_variables())
-      print [var[0].name for var in self.gradient_holders]
 
    def train(self):
       batch = self.mnist.train.next_batch(50)
-      self.apply_gradients.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.keep_prob: 0.5})
+      feed_dict={self.x: batch[0], self.y_: batch[1], self.keep_prob: 0.5}
+
+      #self.num_gradients += 1
+
+      #self.apply_gradients.run(feed_dict={self.x: batch[0], self.y_: batch[1], self.keep_prob: 0.5})
+      self.grads_and_vars = [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients]
+      print self.grads_and_vars[0]
       print 'completed training iteration'
 
    def test(self):
@@ -74,19 +85,26 @@ class TensorSparkModel():
          variable.assign(parameters[i])
 
    def apply_gradients(self, gradients):
-      self.optimizer.apply_gradients(gradients)
+      grads_and_vars = [(tf.convert_to_tensor(gradient), self.variables[i]) for i, gradient in enumerate(gradients)]
+      self.optimizer.apply_gradients(grads_and_vars)
 
    def get_gradients(self):
-      feed_dict = { self.x: tf.zeros([784]), self.y_: tf.zeros([10]), self.keep_prob: 1.0 }
-      for grad in self.gradient_holders:
-         print grad[0].get_shape(), grad[1].name
-         tf.div(grad[0], tf.fill(grad[0].get_shape(), self.num_gradients))
-      return [tf.div(grad[0], tf.fill(grad[0].get_shape(), self.num_gradients)).eval() for grad in self.gradient_holders]
+      return self.grads_and_vars
+#      feed_dict = { self.x: tf.zeros([784]), self.y_: tf.zeros([10]), self.keep_prob: 1.0 }
+#      return [(grad[0].eval(feed_dict=feed_dict), grad[1]) for grad in self.gradient_holders]
+#      for i, grad in enumerate(self.gradient_holders):
+#         print i
+#         fill = tf.fill(self.compute_gradients[i][1].get_shape(), self.num_gradients)
+#         print fill.eval()
+#         print 'fill shape %s grad shape %s' % (fill.get_shape(), grad[0].get_shape())
+#         div  = tf.div(grad[0], fill)#.eval(feed_dict=feed_dict)
+#         print div
+#         print div.eval(feed_dict=feed_dict)
+#      return [tf.div(grad[0], tf.fill(self.compute_gradients[i][0].get_shape(), self.num_gradients)).eval(feed_dict=feed_dict) for i, grad in enumerate(self.gradient_holders)]
 
    def reset_gradients(self):
-      self.num_gradients = 0.0
-      for var in self.variables:
-         print var.name
-      self.gradients = [tf.Variable(tf.zeros(var.get_shape())) for var in self.variables]
+      pass
+#      self.num_gradients = 1.0
+#      self.gradients = [tf.Variable(tf.zeros(var.get_shape())) for var in self.variables]
 
 
