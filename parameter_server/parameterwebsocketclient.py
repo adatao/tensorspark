@@ -50,7 +50,10 @@ class TensorSparkWorker():
       #return [self.train(x) for x in partition]
 
    def test_partition(self, partition):
-      return [self.test(x) for x in partition]
+      labels, features = self.process_partition(partition)
+      accuracy = self.model.test(labels, features)
+      return [accuracy]      
+      #return [self.test(x) for x in partition]
 
    def test(self, data):
       print 'TensorSparkWorker().test "%s"' % data
@@ -62,12 +65,12 @@ class TensorSparkWorker():
 #      self.model.
 
    def time_to_pull(self, iteration):
-      return iteration % 50 == 0 
-#      return True
+#      return iteration % 50 == 0 
+      return True
 
    def time_to_push(self, iteration):
-      return iteration % 50 == 0
-#      return True
+#      return iteration % 50 == 0
+      return True
 
    def request_parameters(self):
       request_model_message = {'type':'client_requests_parameters'}
