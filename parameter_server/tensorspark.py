@@ -12,6 +12,7 @@ def test_partition(partition):
 
 # you can find the mnist csv files here http://pjreddie.com/projects/mnist-in-csv/
 def train_epochs(num_epochs, batch_size):
+#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_train.csv')
 	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
 	for i in range(num_epochs):
 		training_rdd.repartition(training_rdd.count()/batch_size)
@@ -30,7 +31,7 @@ def save_model():
 sc = pyspark.SparkContext()
 websock = websocket.create_connection('ws://localhost:55555')
 num_epochs = 3
-batch_size = 100
+batch_size = 10
 train_epochs(num_epochs, batch_size)
 save_model()
 print test_all()

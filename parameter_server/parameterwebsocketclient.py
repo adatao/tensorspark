@@ -4,13 +4,16 @@ import websocket
 import json
 import tensorflow as tf
 import numpy as np
-from tensorsparkmodel import TensorSparkModel
+#from tensorsparkmodel import TensorSparkModel
+from mnistcnn import MnistCNN
 import download_mnist
 import pickle
 import math
+
 class TensorSparkWorker():
    def __init__(self):
-      self.model = TensorSparkModel()
+      #self.model = TensorSparkModel()
+      self.model = MnistCNN()
       self.websock = websocket.create_connection('ws://localhost:55555')
       self.minibatch_size = 50
       self.iteration = 0
@@ -37,14 +40,15 @@ class TensorSparkWorker():
    def train_partition(self, partition): 
       print 'TensorSparkWorker().train_partition iteration %d' % self.iteration
       labels, features = self.process_partition(partition)
+
+      if self.time_to_pull(self.iteration):
+         self.request_parameters()
+
       accuracy = self.model.train(labels, features)
       self.iteration += 1
 
       if self.time_to_push(self.iteration):
          self.push_gradients()
-
-      if self.time_to_pull(self.iteration):
-         self.request_parameters()
 
       return [accuracy]
       #return [self.train(x) for x in partition]

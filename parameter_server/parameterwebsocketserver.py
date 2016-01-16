@@ -5,9 +5,10 @@ import json
 import numpy as np
 import tensorflow as tf
 from threading import Lock
-import tensorsparkmodel
 import pickle
 import time
+#import tensorsparkmodel
+import mnistcnn
 
 class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
    def open(self):
@@ -43,7 +44,8 @@ class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
          print 'Unknown message type %s' % message['type']
 
 
-model = tensorsparkmodel.TensorSparkModel()
+#model = tensorsparkmodel.TensorSparkModel()
+model = mnistcnn.MnistCNN()
 saver = tf.train.Saver()
 lock = Lock()
 application = tornado.web.Application([
