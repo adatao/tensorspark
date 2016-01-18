@@ -5,8 +5,10 @@ import json
 import numpy as np
 import tensorflow as tf
 from threading import Lock
-import tensorsparkmodel
 import pickle
+import time
+#import tensorsparkmodel
+import mnistcnn
 
 class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
    def open(self):
@@ -17,6 +19,7 @@ class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
 
    def on_message(self, message):
       message = json.loads(message)
+      print 'received message %s' % message['type']
       if message['type'] == 'client_requests_parameters':
          lock.acquire()
          parameters = model.get_parameters()
@@ -32,16 +35,24 @@ class ParameterWebsocketServer(tornado.websocket.WebSocketHandler):
          model.apply_gradients(gradient)
          lock.release()
          print 'applied gradient'
+      elif message['type'] == 'save_model':
+         saver.save(model.session, 'parameter_server_model', global_step=int(time.time()))
+      elif message['type'] == 'restore_model':
+         model_path = message['model_path']
+         saver.restore(model.session, model_path)
       else:
          print 'Unknown message type %s' % message['type']
 
 
-model = tensorsparkmodel.TensorSparkModel()
+#model = tensorsparkmodel.TensorSparkModel()
+model = mnistcnn.MnistCNN()
+saver = tf.train.Saver()
 lock = Lock()
 application = tornado.web.Application([
-    (r"/", ParameterWebsocketServer),
-])
+  (r"/", ParameterWebsocketServer),
+  ])
 
 if __name__ == "__main__":
-    application.listen(55555)
-    tornado.ioloop.IOLoop.current().start()
+  application.listen(55555)
+  tornado.ioloop.IOLoop.current().start()
+  print 'started'

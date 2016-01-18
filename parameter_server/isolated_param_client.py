@@ -17,9 +17,6 @@ def max_pool_2x2(x):
    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                          strides=[1, 2, 2, 1], padding='SAME')
 
-def send_to_parameter_server(l):
-      return l
-
 #mnist = download_mnist.read_data_sets('MNIST_data', one_hot=True)
 
 session = tf.InteractiveSession()
@@ -56,13 +53,17 @@ train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 session.run(tf.initialize_all_variables())
-for i in range(2):
-      batch = mnist.train.next_batch(1000)
-      train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
-      print("step %d, training accuracy %g"%(i, train_accuracy))
-      train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
+saver = tf.train.Saver()
+saver.restore(session, './')
 
-print("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+
+#for i in range(2):
+#      batch = mnist.train.next_batch(1000)
+#      train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
+#      print("step %d, training accuracy %g"%(i, train_accuracy))
+#      train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
+
+#print("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
 
 #gradient_holders = [(g[0],tf.Variable(tf.zeros(g[1].get_shape()))) for i, g in enumerate(compute_gradients)]
 #apply_gradients = optimizer.apply_gradients(gradient_holders)
