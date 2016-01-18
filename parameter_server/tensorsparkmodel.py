@@ -19,6 +19,7 @@ def max_pool_2x2(x):
 class TensorSparkModel():
 
    def __init__(self):
+      #self.session = tf.Session(tf.ConfigProto(inter_op_parallelism_threads=1,intra_op_parallelism_threads=1))
       self.session = tf.InteractiveSession()
       self.x = tf.placeholder("float", shape=[None, 784], name='x')
       x_image = tf.reshape(self.x, [-1,28,28,1], name='reshape')
@@ -59,30 +60,8 @@ class TensorSparkModel():
       self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
       return self.accuracy.eval(feed_dict=feed_dict)
 
-
-   '''
-   def train(self, data):
-      print 'TensorSparkModel().train %s' % data
-      split = data.split(',')
-      label = [[0] * self.get_num_classes()]
-      label[0][int(split[0])] = 1.
-      training_data = [split[1:]]
-
-      feed_dict={self.x: training_data, self.y_: label, self.keep_prob: 0.5}
-
-      self.num_gradients += 1
-      self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
-      return self.accuracy.eval(feed_dict=feed_dict)
-   '''
-
-   def test(self, data):
-      print 'TensorSparkModel().test %s' % data
-      split = data.split(',')
-      label = [[0] * self.get_num_classes()]
-      label[0][int(split[0])] = 1.
-      testing_data = [split[1:]]
-
-      feed_dict = {self.x: testing_data, self.y_: label, self.keep_prob: 1.0}
+   def test(self, labels, features):
+      feed_dict = {self.x: features, self.y_: labels, self.keep_prob: 1.0}
       test_accuracy = self.accuracy.eval(feed_dict=feed_dict)
       print 'accuracy %s' % test_accuracy
       return test_accuracy
@@ -107,4 +86,31 @@ class TensorSparkModel():
       self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]
       self.num_gradients = 0
 
+   '''
+   def train(self, data):
+      print 'TensorSparkModel().train %s' % data
+      split = data.split(',')
+      label = [[0] * self.get_num_classes()]
+      label[0][int(split[0])] = 1.
+      training_data = [split[1:]]
+
+      feed_dict={self.x: training_data, self.y_: label, self.keep_prob: 0.5}
+
+      self.num_gradients += 1
+      self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
+      return self.accuracy.eval(feed_dict=feed_dict)
+   
+
+   def test(self, data):
+      print 'TensorSparkModel().test %s' % data
+      split = data.split(',')
+      label = [[0] * self.get_num_classes()]
+      label[0][int(split[0])] = 1.
+      testing_data = [split[1:]]
+
+      feed_dict = {self.x: testing_data, self.y_: label, self.keep_prob: 1.0}
+      test_accuracy = self.accuracy.eval(feed_dict=feed_dict)
+      print 'accuracy %s' % test_accuracy
+      return test_accuracy
+   '''
 
