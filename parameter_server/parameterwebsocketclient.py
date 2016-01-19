@@ -10,6 +10,11 @@ import download_mnist
 import pickle
 import math
 
+
+# TODO warmup
+# Imagenet
+# Tachyon
+
 class TensorSparkWorker():
    def __init__(self):
       #self.model = TensorSparkModel()
@@ -18,43 +23,57 @@ class TensorSparkWorker():
       self.minibatch_size = 50
       self.iteration = 0
 
-   def process_partition(self, partition):
+   def process_partition(self, partition, batch_size=0):
       num_classes = self.model.get_num_classes()
       features = []
       labels = []
-      for line in partition:
-         if len(line) is 0:
-            continue
-         label = [0] * num_classes
-         split = line.split(',')
-         split[0] = int(split[0])
-         if split[0] >= num_classes:
-            print 'Error label out of range: %d' % split[0]
-            continue
-         features.append(split[1:])
-         label[split[0]] = 1
-         labels.append(label)
+      if batch_size == 0:
+         batch_size = 1000000
+      for i in xrange(batch_size):
+         try:
+            line = partition.next()
+            if len(line) is 0:
+               print 'Skipping empty line'
+               continue
+            label = [0] * num_classes
+            split = line.split(',')
+            split[0] = int(split[0])
+            if split[0] >= num_classes:
+               print 'Error label out of range: %d' % split[0]
+               continue
+            features.append(split[1:])
+            label[split[0]] = 1
+            labels.append(label)
+         except StopIteration:
+            break
 
       return labels, features
 
    def train_partition(self, partition): 
       print 'TensorSparkWorker().train_partition iteration %d' % self.iteration
-      labels, features = self.process_partition(partition)
+      batch_size = 150
+      accuracy = []
+      while True:
+         labels, features = self.process_partition(partition, batch_size)
 
-      if self.time_to_pull(self.iteration):
-         self.request_parameters()
+         if len(labels) is 0:
+            break
 
-      accuracy = self.model.train(labels, features)
-      self.iteration += 1
+         if self.time_to_pull(self.iteration):
+            self.request_parameters()
 
-      if self.time_to_push(self.iteration):
-         self.push_gradients()
+         accuracy.append(self.model.train(labels, features))
+         self.iteration += 1
 
-      return [accuracy]
+         if self.time_to_push(self.iteration):
+            self.push_gradients()
+
+      return accuracy
       #return [self.train(x) for x in partition]
 
    def test_partition(self, partition):
       labels, features = self.process_partition(partition)
+      self.request_parameters()
       accuracy = self.model.test(labels, features)
       return [accuracy]      
       #return [self.test(x) for x in partition]
@@ -69,12 +88,12 @@ class TensorSparkWorker():
 #      self.model.
 
    def time_to_pull(self, iteration):
-#      return iteration % 50 == 0 
-      return True
+      return iteration % 5 == 0 
+#      return True
 
    def time_to_push(self, iteration):
-#      return iteration % 50 == 0
-      return True
+      return iteration % 5 == 0
+#      return True
 
    def request_parameters(self):
       request_model_message = {'type':'client_requests_parameters'}

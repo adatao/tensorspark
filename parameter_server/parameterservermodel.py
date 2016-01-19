@@ -3,7 +3,7 @@ import numpy as np
 
 class ParameterServerModel():
 
-   def __init__(self, x, y_, compute_gradients, accuracy, session):
+   def __init__(self, x, y_, compute_gradients, accuracy, optimizer, session):
       if type(x) != tf.python.framework.ops.Tensor:
          raise(TypeError('x must be of type tf.python.framework.ops.Tensor'))
       if type(y_) != tf.python.framework.ops.Tensor:
@@ -12,6 +12,8 @@ class ParameterServerModel():
          raise(TypeError('accuracy must be of type tf.python.framework.ops.Tensor'))
       if self.compute_gradients_correct_type(compute_gradients) == False:
          raise(TypeError('compute_gradients must be a list of tuples of type (tf.python.framework.ops.Tensor,tf.python.ops.variables.Variable)'))
+      if type(optimizer) != tf.python.training.adam.AdamOptimizer:
+         raise(TypeError('optimizer must be of type tf.python.training.adam.AdamOptimizer'))
       if type(session) != tf.python.client.session.InteractiveSession:
          raise(TypeError('session must be of type tf.python.client.session.InteractiveSession'))
 
@@ -20,6 +22,7 @@ class ParameterServerModel():
       self.compute_gradients = compute_gradients
       self.accuracy = accuracy
       self.session = session
+      self.optimizer = optimizer
       self.reset_gradients()
       self.session.run(tf.initialize_all_variables())
 
@@ -53,7 +56,7 @@ class ParameterServerModel():
       return test_accuracy
 
    def get_parameters(self):
-      return [grad_var[1].eval() for grad_var in self.compute_gradients]
+      return [grad_var[1].eval(session=self.session) for grad_var in self.compute_gradients]
 
    def assign_parameters(self, parameters):
       self.reset_gradients()
@@ -64,6 +67,7 @@ class ParameterServerModel():
 
    def apply_gradients(self, gradients):
       grads_and_vars = [(tf.convert_to_tensor(gradient), self.compute_gradients[i][1]) for i, gradient in enumerate(gradients)]
+      print 'applying gradients %s' % grads_and_vars
       self.optimizer.apply_gradients(grads_and_vars)
 
    def get_gradients(self):

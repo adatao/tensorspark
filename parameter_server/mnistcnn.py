@@ -49,5 +49,5 @@ class MnistCNN(ParameterServerModel):
       correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
       accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
       compute_gradients = optimizer.compute_gradients(loss, variables)
-      ParameterServerModel.__init__(self, x, y_, compute_gradients, accuracy, session)
+      ParameterServerModel.__init__(self, x, y_, compute_gradients, accuracy, optimizer, session)
 
