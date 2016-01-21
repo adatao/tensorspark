@@ -1,0 +1,7 @@
+tensorflow
+websocket-client
+pandas
+tornado
+numpy
+json
+pickle

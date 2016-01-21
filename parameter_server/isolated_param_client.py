@@ -48,13 +48,20 @@ y_conv=tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 #accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 #compute_gradients = optimizer.compute_gradients(loss)
 
+variables = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
+loss = -tf.reduce_sum(y_ * tf.log(y_conv))
+optimizer = tf.train.AdamOptimizer(1e-4)
+compute_gradients = optimizer.compute_gradients(loss, variables)
 cross_entropy = -tf.reduce_sum(y_*tf.log(y_conv))
 train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 session.run(tf.initialize_all_variables())
-saver = tf.train.Saver()
-saver.restore(session, './')
+ops = session.graph.get_operations()
+for element in compute_gradients:
+   print type(element[0]), type(element[1]), element[1].name
+#saver = tf.train.Saver()
+#saver.restore(session, './')
 
 
 #for i in range(2):
