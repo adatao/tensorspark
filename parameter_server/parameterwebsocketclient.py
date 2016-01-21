@@ -14,6 +14,7 @@ import math
 # TODO warmup
 # Imagenet
 # Tachyon
+# Xavier initialization
 
 class TensorSparkWorker():
    def __init__(self):
