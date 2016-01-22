@@ -3,7 +3,7 @@ import numpy as np
 
 class ParameterServerModel():
 
-   def __init__(self, x, y_, compute_gradients, apply_gradients, accuracy, session, placeholder_gradients):
+   def __init__(self, x, y_, keep_prob, compute_gradients, apply_gradients, minimize, accuracy, session, placeholder_gradients):
       if type(x) != tf.python.framework.ops.Tensor:
          raise(TypeError('x must be of type tf.python.framework.ops.Tensor'))
       if type(y_) != tf.python.framework.ops.Tensor:
@@ -11,7 +11,7 @@ class ParameterServerModel():
       if type(accuracy) != tf.python.framework.ops.Tensor:
          raise(TypeError('accuracy must be of type tf.python.framework.ops.Tensor'))
       if self.compute_gradients_correct_type(compute_gradients) == False:
-         raise(TypeError('compute_gradients must be a list of tuples of type (tf.python.framework.ops.Tensor,tf.python.ops.variables.Variable)'))
+         raise(TypeError('compute_gradients must be a list of tuples of type (tf.python.framework.ops.Tensor,tf.python.ops.Variable)'))
       if type(apply_gradients) != tf.python.framework.ops.Operation:
          raise(TypeError('apply_gradients must be of type tf.python.framework.ops.Operation'))
 #      if type(optimizer) != tf.python.training.adam.AdamOptimizer:
@@ -24,12 +24,17 @@ class ParameterServerModel():
       self.session.graph.as_default().__enter__()
       self.x = x
       self.y_ = y_
+      self.keep_prob = keep_prob
       self.compute_gradients = compute_gradients
       self.apply_gradients = apply_gradients
       self.accuracy = accuracy
+      self.accuracy_summary = tf.scalar_summary("accuracy", accuracy)
+      self.minimize = minimize
       self.reset_gradients()
       self.gradient_counter = tf.Variable(initial_value=0, trainable=False)
       self.placeholder_gradients = placeholder_gradients
+      self.merged = tf.merge_all_summaries()
+      self.writer = tf.train.SummaryWriter("./logs", self.session.graph_def)
       self.session.run(tf.initialize_all_variables())
 
    def compute_gradients_correct_type(self, compute_gradients):
@@ -38,20 +43,25 @@ class ParameterServerModel():
       for element in compute_gradients:
          if type(element) != tuple or len(element) != 2:
             return False
-         if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.variables.Variable:
+         if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.Variable:
             return False
       return True
-
 
    def get_num_classes(self):
       return self.y_.get_shape().as_list()[1]
 
    def train(self, labels, features):
       feed_dict={self.x: features, self.y_: labels, self.keep_prob: 0.5}
-      self.num_gradients += 1
       # this can probably be made more efficiently with tf.gradients or tf.add
       self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
-      return self.accuracy.eval(feed_dict=feed_dict)
+      #summary = self.merged.eval(feed_dict=feed_dict)
+      accuracy = self.accuracy.eval(feed_dict=feed_dict)
+#      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
+      #accuracy = self.accuracy.eval(feed_dict=feed_dict)
+#      self.writer.add_summary(summary, self.num_gradients)
+
+      self.num_gradients += 1
+      return accuracy
 
    def test(self, labels, features):
       feed_dict = {self.x: features, self.y_: labels, self.keep_prob: 1.0}
@@ -67,7 +77,7 @@ class ParameterServerModel():
       for i, grad_var in enumerate(self.compute_gradients):
          variable = grad_var[1]
          parameter = parameters[i]
-         variable.assign(parameters[i])
+         variable.assign(parameters[i]).eval()
 
    def apply(self, gradients):
       with self.graph.as_default():
@@ -83,7 +93,7 @@ class ParameterServerModel():
 #         for i, grad_var in enumerate(self.compute_gradients):
 #            feed_dict[grad_var[0]] = grads_and_vars[i][0]
 #         feed_dict = { self.compute_gradients: grads_and_vars}
-         print 'applying gradients %s' % grads_and_vars
+#         print 'applying gradients %s' % grads_and_vars
          #apply_gradients = self.optimizer.apply_gradients(grads_and_vars) #, global_step=self.gradient_counter)
          #print 'graph for apply_gradients'
          #for op in apply_gradients.graph.get_operations():
@@ -102,3 +112,74 @@ class ParameterServerModel():
       self.num_gradients = 0
 
 
+   def train_warmup(self, partition, batch_size=100): 
+      accuracies = []
+      iteration = 0
+      while True:
+         labels, features = process_warmup_data(self, partition, batch_size)
+
+         if len(labels) is 0:
+            break
+         with self.session.as_default():
+            #accuracy = self.train(labels, features)
+            feed = {self.x: features, self.y_: labels, self.keep_prob: 0.5}
+            self.minimize.run(feed_dict = feed)
+            accuracy = self.accuracy.eval(feed_dict={self.x: features, self.y_: labels, self.keep_prob: 1.0})
+            accuracies.append(accuracy)
+            iteration += 1
+            print 'Warmup training iteration %d at %f accuracy' % (iteration, accuracy)
+
+      return accuracies
+
+# pulled this out of the class so we can do static vars via attaching properties to the function
+def process_warmup_data(model, partition, batch_size=0):
+   if 'next_index' not in process_warmup_data.__dict__:
+      process_warmup_data.next_index = 0
+   num_classes = model.get_num_classes()
+   features = []
+   labels = []
+   if batch_size == 0:
+      batch_size = len(partition)
+   last_index = min(len(partition), process_warmup_data.next_index + batch_size)
+   for i in range(process_warmup_data.next_index, last_index):
+      line = partition[i]
+      if len(line) is 0:
+         print 'Skipping empty line'
+         continue
+      label = [0] * num_classes
+      split = line.split(',')
+      split[0] = int(split[0])
+      if split[0] >= num_classes:
+         print 'Error label out of range: %d' % split[0]
+         continue
+      features.append(split[1:])
+      label[split[0]] = 1
+      labels.append(label)
+
+   process_warmup_data.next_index = last_index
+   return labels, features
+
+def xavier_init(n_inputs, n_outputs, uniform=True):
+  """Set the parameter initialization using the method described.
+  This method is designed to keep the scale of the gradients roughly the same
+  in all layers.
+  Xavier Glorot and Yoshua Bengio (2010):
+           Understanding the difficulty of training deep feedforward neural
+           networks. International conference on artificial intelligence and
+           statistics.
+  Args:
+    n_inputs: The number of input nodes into each output.
+    n_outputs: The number of output nodes for each input.
+    uniform: If true use a uniform distribution, otherwise use a normal.
+  Returns:
+    An initializer.
+  """
+  if uniform:
+    # 6 was used in the paper.
+    init_range = math.sqrt(6.0 / (n_inputs + n_outputs))
+    return tf.random_uniform_initializer(-init_range, init_range)
+  else:
+    # 3 gives us approximately the same limits as above since this repicks
+    # values greater than 2 standard deviations from the mean.
+    stddev = math.sqrt(3.0 / (n_inputs + n_outputs))
+    return tf.truncated_normal_initializer(stddev=stddev)

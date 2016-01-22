@@ -11,7 +11,7 @@ import pickle
 import math
 
 
-# TODO warmup
+# TODO
 # Imagenet
 # Tachyon
 # Xavier initialization
@@ -52,8 +52,8 @@ class TensorSparkWorker():
 
    def train_partition(self, partition): 
       print 'TensorSparkWorker().train_partition iteration %d' % self.iteration
-      batch_size = 150
-      accuracy = []
+      batch_size = 100
+      accuracies = []
       while True:
          labels, features = self.process_partition(partition, batch_size)
 
@@ -63,13 +63,14 @@ class TensorSparkWorker():
          if self.time_to_pull(self.iteration):
             self.request_parameters()
 
-         accuracy.append(self.model.train(labels, features))
+         accuracy = self.model.train(labels, features)
+         accuracies.append(accuracy)
          self.iteration += 1
 
          if self.time_to_push(self.iteration):
             self.push_gradients()
 
-      return accuracy
+      return accuracies
       #return [self.train(x) for x in partition]
 
    def test_partition(self, partition):

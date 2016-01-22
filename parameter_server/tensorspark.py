@@ -46,25 +46,27 @@ class ParameterServer(threading.Thread):
 				model_path = message['model_path']
 				ParameterServer.saver.restore(ParameterServer.model.session, model_path)
 			else:
-				print 'Unknown message type %s' % message['type']	
+				print 'Unknown message type %s' % message['type']
 
 	model = mnistcnn.MnistCNN()
 	saver = tf.train.Saver()
 	lock = threading.Lock()
 	application = tornado.web.Application([(r"/", ParameterServerWebsocketHandler)])
 
-	def __init__(self, warmup_data):
+	def __init__(self, warmup_data=None):
 		threading.Thread.__init__(self)
 		self.warmup_data = warmup_data
+		self.warmup(warmup_data)
+
 	def warmup(self, data=None):
-		ParameterServer.model.train_partition(data)
+		if data is not None:
+			ParameterServer.model.train_warmup(data)
 
 	def run(self):
-		self.warmup()
 		self.application.listen(55555)
-		print 'listening at port 55555' 
-  		tornado.ioloop.IOLoop.current().start()
- 	
+		print 'listening at port 55555'
+   		tornado.ioloop.IOLoop.current().start()
+
 
 def train_partition(partition):
 	return parameterwebsocketclient.TensorSparkWorker().train_partition(partition)
@@ -73,12 +75,11 @@ def test_partition(partition):
 	return parameterwebsocketclient.TensorSparkWorker().test_partition(partition)
 
 # you can find the mnist csv files here http://pjreddie.com/projects/mnist-in-csv/
-def train_epochs(num_epochs):
-	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_train.csv')
-#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
+def train_epochs(num_epochs, training_rdd):
 	for i in range(num_epochs):
 		mapped_training = training_rdd.mapPartitions(train_partition)
-		mapped_training.collect()
+		accuracies = mapped_training.collect()
+		print 'accuracies: %s' % accuracies
 		training_rdd.repartition(training_rdd.getNumPartitions())
 
 def test_all():
@@ -90,19 +91,25 @@ def save_model():
 	message = {'type': 'save_model'}
 	websock.send(json.dumps(message))
 
-def start_parameter_server():
-	parameter_server = ParameterServer()
+def start_parameter_server(warmup_data):
+	parameter_server = ParameterServer(warmup_data=warmup_data)
 	parameter_server.start()
 	return parameter_server
 
-parameter_server = start_parameter_server()
-raw_input('Press enter to continue\n')
 try:
 	sc = pyspark.SparkContext()
-	websock = websocket.create_connection('ws://localhost:55555')
+	warmup_iterations = 2000
+#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_train.csv')
+	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
+	warmup_data = training_rdd.take(warmup_iterations)
+	parameter_server = start_parameter_server(warmup_data)
+	raw_input('Press enter to continue\n')
+
 	num_epochs = 3
-	train_epochs(num_epochs)
+	training_rdd = training_rdd.subtract(sc.parallelize(warmup_data))
+	train_epochs(num_epochs, training_rdd)
 	print 'Done training'
+	websock = websocket.create_connection('ws://localhost:55555')
 	save_model()
 	print 'Testing now'
 	print test_all()
