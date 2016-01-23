@@ -51,10 +51,10 @@ class TensorSparkWorker():
       return labels, features
 
    def train_partition(self, partition): 
-      print 'TensorSparkWorker().train_partition iteration %d' % self.iteration
       batch_size = 100
       accuracies = []
       while True:
+         print 'TensorSparkWorker().train_partition iteration %d' % self.iteration
          labels, features = self.process_partition(partition, batch_size)
 
          if len(labels) is 0:

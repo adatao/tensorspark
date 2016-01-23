@@ -113,5 +113,5 @@ try:
 	save_model()
 	print 'Testing now'
 	print test_all()
-except:
+finally:
 	tornado.ioloop.IOLoop.current().stop()

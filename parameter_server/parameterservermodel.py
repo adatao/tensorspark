@@ -3,14 +3,14 @@ import numpy as np
 
 class ParameterServerModel():
 
-   def __init__(self, x, y_, keep_prob, compute_gradients, apply_gradients, minimize, accuracy, session, placeholder_gradients):
+   def __init__(self, x, y_, compute_gradients, apply_gradients, minimize, accuracy, session):
       if type(x) != tf.python.framework.ops.Tensor:
          raise(TypeError('x must be of type tf.python.framework.ops.Tensor'))
       if type(y_) != tf.python.framework.ops.Tensor:
          raise(TypeError('y_ must be of type tf.python.framework.ops.Tensor'))
       if type(accuracy) != tf.python.framework.ops.Tensor:
          raise(TypeError('accuracy must be of type tf.python.framework.ops.Tensor'))
-      if self.compute_gradients_correct_type(compute_gradients) == False:
+      if self.compute_gradients_is_correct_type(compute_gradients) == False:
          raise(TypeError('compute_gradients must be a list of tuples of type (tf.python.framework.ops.Tensor,tf.python.ops.Variable)'))
       if type(apply_gradients) != tf.python.framework.ops.Operation:
          raise(TypeError('apply_gradients must be of type tf.python.framework.ops.Operation'))
@@ -24,7 +24,6 @@ class ParameterServerModel():
       self.session.graph.as_default().__enter__()
       self.x = x
       self.y_ = y_
-      self.keep_prob = keep_prob
       self.compute_gradients = compute_gradients
       self.apply_gradients = apply_gradients
       self.accuracy = accuracy
@@ -32,12 +31,19 @@ class ParameterServerModel():
       self.minimize = minimize
       self.reset_gradients()
       self.gradient_counter = tf.Variable(initial_value=0, trainable=False)
-      self.placeholder_gradients = placeholder_gradients
+
+      self.parameter_assignments = []
+      for grad_var in self.compute_gradients:
+         gradient = grad_var[0]
+         variable = grad_var[1]
+         self.parameter_assignments.append(variable.assign(gradient))
+
+
       self.merged = tf.merge_all_summaries()
       self.writer = tf.train.SummaryWriter("./logs", self.session.graph_def)
       self.session.run(tf.initialize_all_variables())
 
-   def compute_gradients_correct_type(self, compute_gradients):
+   def compute_gradients_is_correct_type(self, compute_gradients):
       if type(compute_gradients) != list:
          return False
       for element in compute_gradients:
@@ -51,7 +57,7 @@ class ParameterServerModel():
       return self.y_.get_shape().as_list()[1]
 
    def train(self, labels, features):
-      feed_dict={self.x: features, self.y_: labels, self.keep_prob: 0.5}
+      feed_dict={self.x: features, self.y_: labels}
       # this can probably be made more efficiently with tf.gradients or tf.add
       self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
       #summary = self.merged.eval(feed_dict=feed_dict)
@@ -64,7 +70,7 @@ class ParameterServerModel():
       return accuracy
 
    def test(self, labels, features):
-      feed_dict = {self.x: features, self.y_: labels, self.keep_prob: 1.0}
+      feed_dict = {self.x: features, self.y_: labels}
       test_accuracy = self.accuracy.eval(feed_dict=feed_dict)
       print 'accuracy %s' % test_accuracy
       return test_accuracy
@@ -75,32 +81,20 @@ class ParameterServerModel():
    def assign_parameters(self, parameters):
       self.reset_gradients()
       for i, grad_var in enumerate(self.compute_gradients):
-         variable = grad_var[1]
+         gradient = grad_var[0]
          parameter = parameters[i]
-         variable.assign(parameters[i]).eval()
+         feed={gradient:parameter}
+         self.parameter_assignments[i].eval(feed_dict=feed)
+#         variable.assign(parameter).eval()
 
    def apply(self, gradients):
       with self.graph.as_default():
          grads_and_vars = [(tf.convert_to_tensor(gradient), self.compute_gradients[i][1]) for i, gradient in enumerate(gradients)]
          feed_dict = {}
          for i, grad_var in enumerate(self.compute_gradients):
-#            name = 'placeholder_%s' % grad_var[1].name
-#            feed_dict[self.placeholder_gradients[i][0]] = tf.convert_to_tensor(gradients[i])
-            feed_dict[self.placeholder_gradients[i][0]] = gradients[i]
-#            placeholder_gradients.append((tf.placeholder('float', shape=grad_var[1].get_shape(), name='placeholder_%s' % name) ,grad_var[1]))
+            feed_dict[grad_var[0]] = gradients[i]
 
 
-#         for i, grad_var in enumerate(self.compute_gradients):
-#            feed_dict[grad_var[0]] = grads_and_vars[i][0]
-#         feed_dict = { self.compute_gradients: grads_and_vars}
-#         print 'applying gradients %s' % grads_and_vars
-         #apply_gradients = self.optimizer.apply_gradients(grads_and_vars) #, global_step=self.gradient_counter)
-         #print 'graph for apply_gradients'
-         #for op in apply_gradients.graph.get_operations():
-         #   print op.name        
-         #print 'graph for session'
-         #for op in self.session.graph.get_operations():
-         #   print op.name
          self.apply_gradients.run(session=self.session, feed_dict=feed_dict)
          print 'applied gradients'
 
@@ -122,9 +116,9 @@ class ParameterServerModel():
             break
          with self.session.as_default():
             #accuracy = self.train(labels, features)
-            feed = {self.x: features, self.y_: labels, self.keep_prob: 0.5}
+            feed = {self.x: features, self.y_: labels}
             self.minimize.run(feed_dict = feed)
-            accuracy = self.accuracy.eval(feed_dict={self.x: features, self.y_: labels, self.keep_prob: 1.0})
+            accuracy = self.accuracy.eval(feed_dict=feed)
             accuracies.append(accuracy)
             iteration += 1
             print 'Warmup training iteration %d at %f accuracy' % (iteration, accuracy)
