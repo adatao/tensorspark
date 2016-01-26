@@ -5,7 +5,8 @@ import json
 import tensorflow as tf
 import numpy as np
 #from tensorsparkmodel import TensorSparkModel
-from mnistcnn import MnistCNN
+#from mnistcnn import MnistCNN
+import mnistdnn
 import download_mnist
 import pickle
 import math
@@ -17,9 +18,11 @@ import math
 # Xavier initialization
 
 class TensorSparkWorker():
+#   def __init__(self, model):
    def __init__(self):
       #self.model = TensorSparkModel()
-      self.model = MnistCNN()
+      self.model = mnistdnn.MnistDNN()
+#      self.model = model
       self.websock = websocket.create_connection('ws://localhost:55555')
       self.minibatch_size = 50
       self.iteration = 0
