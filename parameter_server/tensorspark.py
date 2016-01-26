@@ -15,9 +15,6 @@ import time
 from sacred import Experiment
 from sacred.observers import MongoObserver
 
-ex = Experiment('tensorspark')
-ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
-model = mnistdnn.MnistDNN()
 
 class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 
@@ -102,11 +99,15 @@ def save_model():
 	websock.send(json.dumps(message))
 
 
-#@ex.capture
 def start_parameter_server(model, warmup_data):
 	parameter_server = ParameterServer(model=model, warmup_data=warmup_data)
 	parameter_server.start()
 	return parameter_server
+
+
+ex = Experiment('tensorspark')
+ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
+model = mnistdnn.MnistDNN()
 
 @ex.config
 def configure_experiment():
@@ -129,6 +130,6 @@ def main(warmup_iterations, num_epochs):
 		print 'Done training'
 		save_model()
 		print 'Testing now'
-		print test_all(parameter_server)
+		print test_all()
 	finally:
 		tornado.ioloop.IOLoop.current().stop()
