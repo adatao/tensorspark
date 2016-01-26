@@ -65,8 +65,8 @@ class MnistDNN(ParameterServerModel):
 		apply_gradients = optimizer.apply_gradients(compute_gradients)
 		minimize = optimizer.minimize(loss)
 		correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
-		accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+		error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, accuracy, session)
+		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session)
 
 

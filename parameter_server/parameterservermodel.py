@@ -3,21 +3,21 @@ import numpy as np
 
 class ParameterServerModel():
 
-   def __init__(self, x, y_, compute_gradients, apply_gradients, minimize, accuracy, session):
-      if type(x) != tf.python.framework.ops.Tensor:
-         raise(TypeError('x must be of type tf.python.framework.ops.Tensor'))
-      if type(y_) != tf.python.framework.ops.Tensor:
-         raise(TypeError('y_ must be of type tf.python.framework.ops.Tensor'))
-      if type(accuracy) != tf.python.framework.ops.Tensor:
-         raise(TypeError('accuracy must be of type tf.python.framework.ops.Tensor'))
-      if self.compute_gradients_is_correct_type(compute_gradients) == False:
-         raise(TypeError('compute_gradients must be a list of tuples of type (tf.python.framework.ops.Tensor,tf.python.ops.Variable)'))
-      if type(apply_gradients) != tf.python.framework.ops.Operation:
-         raise(TypeError('apply_gradients must be of type tf.python.framework.ops.Operation'))
-#      if type(optimizer) != tf.python.training.adam.AdamOptimizer:
-#         raise(TypeError('optimizer must be of type tf.python.training.adam.AdamOptimizer'))
-      if type(session) != tf.python.client.session.InteractiveSession:
-         raise(TypeError('session must be of type tf.python.client.session.InteractiveSession'))
+   def __init__(self, x, y_, compute_gradients, apply_gradients, minimize, error_rate, session):
+#       if type(x) != tf.python.framework.ops.Tensor:
+#          raise(TypeError('x must be of type tf.python.framework.ops.Tensor'))
+#       if type(y_) != tf.python.framework.ops.Tensor:
+#          raise(TypeError('y_ must be of type tf.python.framework.ops.Tensor'))
+#       if type(accuracy) != tf.python.framework.ops.Tensor:
+#          raise(TypeError('accuracy must be of type tf.python.framework.ops.Tensor'))
+#       if self.compute_gradients_is_correct_type(compute_gradients) == False:
+#          raise(TypeError('compute_gradients must be a list of tuples of type (tf.python.framework.ops.Tensor,tf.python.ops.Variable)'))
+#       if type(apply_gradients) != tf.python.framework.ops.Operation:
+#          raise(TypeError('apply_gradients must be of type tf.python.framework.ops.Operation'))
+# #      if type(optimizer) != tf.python.training.adam.AdamOptimizer:
+# #         raise(TypeError('optimizer must be of type tf.python.training.adam.AdamOptimizer'))
+#       if type(session) != tf.python.client.session.InteractiveSession:
+#          raise(TypeError('session must be of type tf.python.client.session.InteractiveSession'))
 
       self.session = session
       self.graph = session.graph
@@ -26,8 +26,8 @@ class ParameterServerModel():
       self.y_ = y_
       self.compute_gradients = compute_gradients
       self.apply_gradients = apply_gradients
-      self.accuracy = accuracy
-      self.accuracy_summary = tf.scalar_summary("accuracy", accuracy)
+      self.error_rate = error_rate
+      self.error_rate_summary = tf.scalar_summary("error_rate", error_rate)
       self.minimize = minimize
       self.reset_gradients()
       self.gradient_counter = tf.Variable(initial_value=0, trainable=False)
@@ -61,19 +61,19 @@ class ParameterServerModel():
       # this can probably be made more efficiently with tf.gradients or tf.add
       self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
       #summary = self.merged.eval(feed_dict=feed_dict)
-      accuracy = self.accuracy.eval(feed_dict=feed_dict)
+      error_rate = self.error_rate.eval(feed_dict=feed_dict)
 #      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
       #accuracy = self.accuracy.eval(feed_dict=feed_dict)
 #      self.writer.add_summary(summary, self.num_gradients)
 
       self.num_gradients += 1
-      return accuracy
+      return error_rate
 
    def test(self, labels, features):
       feed_dict = {self.x: features, self.y_: labels}
-      test_accuracy = self.accuracy.eval(feed_dict=feed_dict)
-      print 'accuracy %s' % test_accuracy
-      return test_accuracy
+      test_error_rate = self.error_rate.eval(feed_dict=feed_dict)
+      print 'error_rate %s' % test_error_rate
+      return test_error_rate
 
    def get_parameters(self):
       return [grad_var[1].eval(session=self.session) for grad_var in self.compute_gradients]
@@ -118,10 +118,10 @@ class ParameterServerModel():
             #accuracy = self.train(labels, features)
             feed = {self.x: features, self.y_: labels}
             self.minimize.run(feed_dict = feed)
-            accuracy = self.accuracy.eval(feed_dict=feed)
-            accuracies.append(accuracy)
+            error_rate = self.error_rate.eval(feed_dict=feed)
+            accuracies.append(error_rate)
             iteration += 1
-            print 'Warmup training iteration %d at %f accuracy' % (iteration, accuracy)
+            print 'Warmup training iteration %d at %f error_rate' % (iteration, error_rate)
 
       return accuracies
 
