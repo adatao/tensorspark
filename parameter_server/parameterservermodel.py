@@ -107,11 +107,11 @@ class ParameterServerModel():
 
 
    def train_warmup(self, partition, batch_size=100): 
-      accuracies = []
+      error_rates = []
       iteration = 0
-      while True:
-         labels, features = process_warmup_data(self, partition, batch_size)
-
+      for i in range(0, len(partition), batch_size):
+         data = partition[i:i+batch_size]
+         labels, features = self.process_warmup_data(data, batch_size)
          if len(labels) is 0:
             break
          with self.session.as_default():
@@ -119,61 +119,68 @@ class ParameterServerModel():
             feed = {self.x: features, self.y_: labels}
             self.minimize.run(feed_dict = feed)
             error_rate = self.error_rate.eval(feed_dict=feed)
-            accuracies.append(error_rate)
+            error_rates.append(error_rate)
             iteration += 1
             print 'Warmup training iteration %d at %f error_rate' % (iteration, error_rate)
 
-      return accuracies
+      return error_rates
+
+   def process_warmup_data(self, data, batch_size=0):
+      raise AssertionError('function not implemented')
+
+   def process_partition(self, partition, batch_size=0):
+      raise AssertionError('function not implemented')
+
 
 # pulled this out of the class so we can do static vars via attaching properties to the function
-def process_warmup_data(model, partition, batch_size=0):
-   if 'next_index' not in process_warmup_data.__dict__:
-      process_warmup_data.next_index = 0
-   num_classes = model.get_num_classes()
-   features = []
-   labels = []
-   if batch_size == 0:
-      batch_size = len(partition)
-   last_index = min(len(partition), process_warmup_data.next_index + batch_size)
-   for i in range(process_warmup_data.next_index, last_index):
-      line = partition[i]
-      if len(line) is 0:
-         print 'Skipping empty line'
-         continue
-      label = [0] * num_classes
-      split = line.split(',')
-      split[0] = int(split[0])
-      if split[0] >= num_classes:
-         print 'Error label out of range: %d' % split[0]
-         continue
-      features.append(split[1:])
-      label[split[0]] = 1
-      labels.append(label)
+# def process_warmup_data(model, partition, batch_size=0):
+#    if 'next_index' not in process_warmup_data.__dict__:
+#       process_warmup_data.next_index = 0
+#    num_classes = model.get_num_classes()
+#    features = []
+#    labels = []
+#    if batch_size == 0:
+#       batch_size = len(partition)
+#    last_index = min(len(partition), process_warmup_data.next_index + batch_size)
+#    for i in range(process_warmup_data.next_index, last_index):
+#       line = partition[i]
+#       if len(line) is 0:
+#          print 'Skipping empty line'
+#          continue
+#       label = [0] * num_classes
+#       split = line.split(',')
+#       split[0] = int(split[0])
+#       if split[0] >= num_classes:
+#          print 'Error label out of range: %d' % split[0]
+#          continue
+#       features.append(split[1:])
+#       label[split[0]] = 1
+#       labels.append(label)
 
-   process_warmup_data.next_index = last_index
-   return labels, features
+#    process_warmup_data.next_index = last_index
+#    return labels, features
 
-def xavier_init(n_inputs, n_outputs, uniform=True):
-  """Set the parameter initialization using the method described.
-  This method is designed to keep the scale of the gradients roughly the same
-  in all layers.
-  Xavier Glorot and Yoshua Bengio (2010):
-           Understanding the difficulty of training deep feedforward neural
-           networks. International conference on artificial intelligence and
-           statistics.
-  Args:
-    n_inputs: The number of input nodes into each output.
-    n_outputs: The number of output nodes for each input.
-    uniform: If true use a uniform distribution, otherwise use a normal.
-  Returns:
-    An initializer.
-  """
-  if uniform:
-    # 6 was used in the paper.
-    init_range = math.sqrt(6.0 / (n_inputs + n_outputs))
-    return tf.random_uniform_initializer(-init_range, init_range)
-  else:
-    # 3 gives us approximately the same limits as above since this repicks
-    # values greater than 2 standard deviations from the mean.
-    stddev = math.sqrt(3.0 / (n_inputs + n_outputs))
-    return tf.truncated_normal_initializer(stddev=stddev)
+# def xavier_init(n_inputs, n_outputs, uniform=True):
+#   """Set the parameter initialization using the method described.
+#   This method is designed to keep the scale of the gradients roughly the same
+#   in all layers.
+#   Xavier Glorot and Yoshua Bengio (2010):
+#            Understanding the difficulty of training deep feedforward neural
+#            networks. International conference on artificial intelligence and
+#            statistics.
+#   Args:
+#     n_inputs: The number of input nodes into each output.
+#     n_outputs: The number of output nodes for each input.
+#     uniform: If true use a uniform distribution, otherwise use a normal.
+#   Returns:
+#     An initializer.
+#   """
+#   if uniform:
+#     # 6 was used in the paper.
+#     init_range = math.sqrt(6.0 / (n_inputs + n_outputs))
+#     return tf.random_uniform_initializer(-init_range, init_range)
+#   else:
+#     # 3 gives us approximately the same limits as above since this repicks
+#     # values greater than 2 standard deviations from the mean.
+#     stddev = math.sqrt(3.0 / (n_inputs + n_outputs))
+#     return tf.truncated_normal_initializer(stddev=stddev)

@@ -7,6 +7,7 @@ import numpy as np
 #from tensorsparkmodel import TensorSparkModel
 #from mnistcnn import MnistCNN
 import mnistdnn
+#import higgsdnn
 import download_mnist
 import pickle
 import math
@@ -22,43 +23,44 @@ class TensorSparkWorker():
    def __init__(self):
       #self.model = TensorSparkModel()
       self.model = mnistdnn.MnistDNN()
+#      self.model = higgsdnn.HiggsDNN()
 #      self.model = model
       self.websock = websocket.create_connection('ws://localhost:55555')
       self.minibatch_size = 50
       self.iteration = 0
 
-   def process_partition(self, partition, batch_size=0):
-      num_classes = self.model.get_num_classes()
-      features = []
-      labels = []
-      if batch_size == 0:
-         batch_size = 1000000
-      for i in xrange(batch_size):
-         try:
-            line = partition.next()
-            if len(line) is 0:
-               print 'Skipping empty line'
-               continue
-            label = [0] * num_classes
-            split = line.split(',')
-            split[0] = int(split[0])
-            if split[0] >= num_classes:
-               print 'Error label out of range: %d' % split[0]
-               continue
-            features.append(split[1:])
-            label[split[0]] = 1
-            labels.append(label)
-         except StopIteration:
-            break
+   # def process_partition(self, partition, batch_size=0):
+   #    num_classes = self.model.get_num_classes()
+   #    features = []
+   #    labels = []
+   #    if batch_size == 0:
+   #       batch_size = 1000000
+   #    for i in xrange(batch_size):
+   #       try:
+   #          line = partition.next()
+   #          if len(line) is 0:
+   #             print 'Skipping empty line'
+   #             continue
+   #          label = [0] * num_classes
+   #          split = line.split(',')
+   #          split[0] = int(split[0])
+   #          if split[0] >= num_classes:
+   #             print 'Error label out of range: %d' % split[0]
+   #             continue
+   #          features.append(split[1:])
+   #          label[split[0]] = 1
+   #          labels.append(label)
+   #       except StopIteration:
+   #          break
 
-      return labels, features
+   #    return labels, features
 
    def train_partition(self, partition): 
       batch_size = 100
       accuracies = []
       while True:
          print 'TensorSparkWorker().train_partition iteration %d' % self.iteration
-         labels, features = self.process_partition(partition, batch_size)
+         labels, features = self.model.process_partition(partition, batch_size)
 
          if len(labels) is 0:
             break

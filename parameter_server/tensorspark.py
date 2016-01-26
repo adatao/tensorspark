@@ -9,6 +9,7 @@ import tornado.ioloop
 import tornado.websocket
 #import mnistcnn
 import mnistdnn
+#import higgsdnn
 import tensorflow as tf
 import pickle
 import time
@@ -108,6 +109,8 @@ def start_parameter_server(model, warmup_data):
 ex = Experiment('tensorspark')
 ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
 model = mnistdnn.MnistDNN()
+#model = higgsdnn.HiggsDNN()
+sc = pyspark.SparkContext()
 
 @ex.config
 def configure_experiment():
@@ -118,9 +121,8 @@ def configure_experiment():
 @ex.automain
 def main(warmup_iterations, num_epochs):
 	try:
-		sc = pyspark.SparkContext()
-	#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_train.csv')
-		training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
+		training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_train.csv')
+	#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
 		warmup_data = training_rdd.take(warmup_iterations)
 		parameter_server = start_parameter_server(model=model, warmup_data=warmup_data)
 		raw_input('Press enter to continue\n')

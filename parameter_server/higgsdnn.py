@@ -86,7 +86,45 @@ class HiggsDNN(ParameterServerModel):
 		correct_prediction = tf.equal(tf.clip_by_value(tf.round(guess_y), 0, 1), tf.clip_by_value(tf.round(true_y), 0, 1))
 		error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 #		correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
-#		accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
 
 		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session)
+
+
+	def process_warmup_data(self, data, batch_size=0):
+	   num_classes = self.get_num_classes()
+	   features = []
+	   labels = []
+	   if batch_size == 0:
+	      batch_size = len(data)
+	   for line in data:
+	      if len(line) is 0:
+	         print 'Skipping empty line'
+	         continue
+	      split = line.split(',')
+	      features.append(split[:28])
+	      labels.append(float(split[28]))
+
+	   return labels, features
+
+	def process_partition(self, partition, batch_size=0):
+		num_classes = self.get_num_classes()
+		features = []
+		labels = []
+		if batch_size == 0:
+			batch_size = 1000000
+		for i in xrange(batch_size):
+			try:
+				line = partition.next()
+				if len(line) is 0:
+				   print 'Skipping empty line'
+				   continue
+				split = line.split(',')
+				features.append(split[:28])
+				labels.append(float(split[28]))
+			except StopIteration:
+				break
+
+		return labels, features
+
+

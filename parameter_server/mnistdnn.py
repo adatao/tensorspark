@@ -69,4 +69,52 @@ class MnistDNN(ParameterServerModel):
 
 		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session)
 
+	def process_warmup_data(self, data, batch_size=0):
+	   num_classes = self.get_num_classes()
+	   features = []
+	   labels = []
+	   if batch_size == 0:
+	      batch_size = len(data)
+	   for line in data:
+	      if len(line) is 0:
+	         print 'Skipping empty line'
+	         continue
+	      label = [0] * num_classes
+	      split = line.split(',')
+	      split[0] = int(split[0])
+	      if split[0] >= num_classes:
+	         print 'Error label out of range: %d' % split[0]
+	         continue
+	      features.append(split[1:])
+	      label[split[0]] = 1
+	      labels.append(label)
+
+	   return labels, features
+
+	def process_partition(self, partition, batch_size=0):
+		num_classes = self.get_num_classes()
+		features = []
+		labels = []
+		if batch_size == 0:
+			batch_size = 1000000
+		for i in xrange(batch_size):
+		 try:
+		    line = partition.next()
+		    if len(line) is 0:
+		       print 'Skipping empty line'
+		       continue
+		    label = [0] * num_classes
+		    split = line.split(',')
+		    split[0] = int(split[0])
+		    if split[0] >= num_classes:
+		       print 'Error label out of range: %d' % split[0]
+		       continue
+		    features.append(split[1:])
+		    label[split[0]] = 1
+		    labels.append(label)
+		 except StopIteration:
+		    break
+
+		return labels, features
+
 
