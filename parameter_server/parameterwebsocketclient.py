@@ -1,17 +1,18 @@
 #!/usr/local/bin/bpython
 # -*- coding: utf-8 -*-
-import websocket
+#import websocket
 import json
 import tensorflow as tf
-import numpy as np
 #from tensorsparkmodel import TensorSparkModel
 #from mnistcnn import MnistCNN
 import mnistdnn
 #import higgsdnn
-import download_mnist
+#import download_mnist
 import pickle
 import math
-
+import tornado.websocket
+from tornado import gen 
+from tornado.ioloop import IOLoop
 
 # TODO
 # Imagenet
@@ -25,9 +26,14 @@ class TensorSparkWorker():
       self.model = mnistdnn.MnistDNN()
 #      self.model = higgsdnn.HiggsDNN()
 #      self.model = model
-      self.websock = websocket.create_connection('ws://localhost:55555')
+#      self.websock = websocket.create_connection('ws://localhost:55555')
+      IOLoop.current().run_sync(self.init_websocket)
       self.minibatch_size = 50
       self.iteration = 0
+
+   @gen.coroutine
+   def init_websocket(self):
+      self.websock = yield tornado.websocket.websocket_connect("ws://localhost:55555/")
 
    # def process_partition(self, partition, batch_size=0):
    #    num_classes = self.model.get_num_classes()
@@ -103,20 +109,28 @@ class TensorSparkWorker():
 #      return True
 
    def request_parameters(self):
+      IOLoop.current().run_sync(self.request_parameters_coroutine)
+
+   @gen.coroutine
+   def request_parameters_coroutine(self):
       request_model_message = {'type':'client_requests_parameters'}
-      self.websock.send(json.dumps(request_model_message))
+      self.websock.write_message(json.dumps(request_model_message))
       print 'requesting parameters'
-      parameters = pickle.loads(self.websock.recv())
+      pickled_parameters = yield self.websock.read_message()
+      parameters = pickle.loads(pickled_parameters)
       print 'received parameters'
       self.model.assign_parameters(parameters)
 
    def push_gradients(self):
+      IOLoop.current().run_sync(self.push_gradients_coroutine)
+
+   @gen.coroutine
+   def push_gradients_coroutine(self):
       print 'pushing gradients'
       gradient = pickle.dumps(self.model.get_gradients())
       gradient_update_message = {'type':'client_gives_gradient', 'gradient':gradient}
-      self.websock.send(json.dumps(gradient_update_message))
-      print 'pushed gradients'
-
+      self.websock.write_message(json.dumps(gradient_update_message))
+      print 'pushed gradients'      
 
 
 #def train(self, data):

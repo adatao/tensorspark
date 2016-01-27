@@ -135,7 +135,7 @@ def main(warmup_iterations, num_epochs):
 		print 'Done training'
 		save_model()
 		print 'Testing now'
-		test_results test_all()
+		test_results = test_all()
 		print test_results
 		sc.show_profiles()
 		return test_results
