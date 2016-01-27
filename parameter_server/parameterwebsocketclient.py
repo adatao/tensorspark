@@ -6,6 +6,8 @@ import tensorflow as tf
 #from tensorsparkmodel import TensorSparkModel
 #from mnistcnn import MnistCNN
 import mnistdnn
+import higgsdnn
+import moleculardnn
 #import higgsdnn
 #import download_mnist
 import pickle
@@ -20,15 +22,12 @@ from tornado.ioloop import IOLoop
 # Xavier initialization
 
 class TensorSparkWorker():
-#   def __init__(self, model):
+
    def __init__(self):
-      #self.model = TensorSparkModel()
-      self.model = mnistdnn.MnistDNN()
-#      self.model = higgsdnn.HiggsDNN()
-#      self.model = model
+#      self.model = mnistdnn.MnistDNN()      
+      self.model = moleculardnn.MolecularDNN()
 #      self.websock = websocket.create_connection('ws://localhost:55555')
       IOLoop.current().run_sync(self.init_websocket)
-      self.minibatch_size = 50
       self.iteration = 0
 
    @gen.coroutine
