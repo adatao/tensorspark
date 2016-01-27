@@ -8,6 +8,7 @@ import tornado.web
 import tornado.ioloop
 import tornado.websocket
 #import mnistcnn
+import os
 import mnistdnn
 import higgsdnn
 import moleculardnn
@@ -17,7 +18,8 @@ import time
 from sacred import Experiment
 from sacred.observers import MongoObserver
 
-directory = "/Users/ushnishde/Documents/TensorSpark/"
+directory = "/Users/christophersmith/code/adatao/tensorspark/data/"
+#directory = "/Users/ushnishde/Documents/TensorSpark/"
 
 class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 
@@ -94,7 +96,7 @@ def train_epochs(num_epochs, training_rdd):
 		training_rdd.repartition(training_rdd.getNumPartitions())
 
 def test_all():
-	testing_rdd = sc.textFile(directory + "molecular/molecular_test_all.csv")
+	testing_rdd = sc.textFile('%smnist_test.csv' % directory)
 	mapped_testing = testing_rdd.mapPartitions(test_partition)
 	return mapped_testing.reduce(add)/mapped_testing.getNumPartitions()
 
@@ -112,22 +114,23 @@ def start_parameter_server(model, warmup_data):
 
 ex = Experiment('tensorspark')
 ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
-#model = mnistdnn.MnistDNN()
+model = mnistdnn.MnistDNN()
 #model = higgsdnn.HiggsDNN()
-model = moleculardnn.MolecularDNN()
+#model = moleculardnn.MolecularDNN()
 conf = pyspark.SparkConf().set("spark.python.profile", "true")
 sc = pyspark.SparkContext(conf=conf)
 
 @ex.config
 def configure_experiment():
-	warmup_iterations = 10000
+	warmup_iterations = 2000
 	num_epochs = 3
 
 @ex.capture
 @ex.automain
 def main(warmup_iterations, num_epochs):
 	try:
-		training_rdd = sc.textFile(directory + "molecular/molecular_train_all.csv")
+#		training_rdd = sc.textFile(directory + "molecular/molecular_train_all.csv")
+		training_rdd = sc.textFile('%smnist_train.csv' % directory)
 	#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
 		warmup_data = training_rdd.take(warmup_iterations)
 		parameter_server = start_parameter_server(model=model, warmup_data=warmup_data)

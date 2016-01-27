@@ -24,8 +24,8 @@ from tornado.ioloop import IOLoop
 class TensorSparkWorker():
 
    def __init__(self):
-#      self.model = mnistdnn.MnistDNN()      
-      self.model = moleculardnn.MolecularDNN()
+      self.model = mnistdnn.MnistDNN()      
+#      self.model = moleculardnn.MolecularDNN()
 #      self.websock = websocket.create_connection('ws://localhost:55555')
       IOLoop.current().run_sync(self.init_websocket)
       self.iteration = 0
@@ -33,32 +33,6 @@ class TensorSparkWorker():
    @gen.coroutine
    def init_websocket(self):
       self.websock = yield tornado.websocket.websocket_connect("ws://localhost:55555/")
-
-   # def process_partition(self, partition, batch_size=0):
-   #    num_classes = self.model.get_num_classes()
-   #    features = []
-   #    labels = []
-   #    if batch_size == 0:
-   #       batch_size = 1000000
-   #    for i in xrange(batch_size):
-   #       try:
-   #          line = partition.next()
-   #          if len(line) is 0:
-   #             print 'Skipping empty line'
-   #             continue
-   #          label = [0] * num_classes
-   #          split = line.split(',')
-   #          split[0] = int(split[0])
-   #          if split[0] >= num_classes:
-   #             print 'Error label out of range: %d' % split[0]
-   #             continue
-   #          features.append(split[1:])
-   #          label[split[0]] = 1
-   #          labels.append(label)
-   #       except StopIteration:
-   #          break
-
-   #    return labels, features
 
    def train_partition(self, partition): 
       batch_size = 100
@@ -84,7 +58,7 @@ class TensorSparkWorker():
       #return [self.train(x) for x in partition]
 
    def test_partition(self, partition):
-      labels, features = self.process_partition(partition)
+      labels, features = self.model.process_partition(partition)
       self.request_parameters()
       accuracy = self.model.test(labels, features)
       return [accuracy]      
@@ -130,20 +104,4 @@ class TensorSparkWorker():
       gradient_update_message = {'type':'client_gives_gradient', 'gradient':gradient}
       self.websock.write_message(json.dumps(gradient_update_message))
       print 'pushed gradients'      
-
-
-#def train(self, data):
-#   print 'TensorSparkWorker().train iteration %d' % self.iteration
-#   if len(data) is 0:
-#      return 1
-#   accuracy = self.model.train(data)
-#   self.iteration += 1
-
-#   if self.time_to_push(self.iteration):
-#      self.push_gradients()
-
-#   if self.time_to_pull(self.iteration):
-#      self.request_parameters()
-
-#   return accuracy
 
