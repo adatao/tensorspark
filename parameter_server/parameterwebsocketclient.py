@@ -7,6 +7,8 @@ import numpy as np
 #from tensorsparkmodel import TensorSparkModel
 #from mnistcnn import MnistCNN
 import mnistdnn
+import higgsdnn
+import moleculardnn
 #import higgsdnn
 import download_mnist
 import pickle
@@ -22,8 +24,8 @@ class TensorSparkWorker():
 #   def __init__(self, model):
    def __init__(self):
       #self.model = TensorSparkModel()
-      self.model = mnistdnn.MnistDNN()
-#      self.model = higgsdnn.HiggsDNN()
+#      self.model = mnistdnn.MnistDNN()
+      self.model = higgsdnn.HiggsDNN()
 #      self.model = model
       self.websock = websocket.create_connection('ws://localhost:55555')
       self.minibatch_size = 50

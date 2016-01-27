@@ -9,13 +9,15 @@ import tornado.ioloop
 import tornado.websocket
 #import mnistcnn
 import mnistdnn
-#import higgsdnn
+import higgsdnn
+import moleculardnn
 import tensorflow as tf
 import pickle
 import time
 from sacred import Experiment
 from sacred.observers import MongoObserver
 
+directory = "/Users/ushnishde/Documents/TensorSpark/"
 
 class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 
@@ -90,7 +92,7 @@ def train_epochs(num_epochs, training_rdd):
 		training_rdd.repartition(training_rdd.getNumPartitions())
 
 def test_all():
-	testing_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_test.csv')
+	testing_rdd = sc.textFile(directory + "higgs/higgs_test_all.csv")
 	mapped_testing = testing_rdd.mapPartitions(test_partition)
 	return mapped_testing.reduce(add)/mapped_testing.getNumPartitions()
 
@@ -108,24 +110,24 @@ def start_parameter_server(model, warmup_data):
 
 ex = Experiment('tensorspark')
 ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
-model = mnistdnn.MnistDNN()
-#model = higgsdnn.HiggsDNN()
+#model = mnistdnn.MnistDNN()
+model = higgsdnn.HiggsDNN()
 sc = pyspark.SparkContext()
 
 @ex.config
 def configure_experiment():
-	warmup_iterations = 2000
+	warmup_iterations = 10000
 	num_epochs = 3
 
 @ex.capture
 @ex.automain
 def main(warmup_iterations, num_epochs):
 	try:
-		training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/mnist_train.csv')
+		training_rdd = sc.textFile(directory + "higgs/higgs_train_all.csv")
 	#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
 		warmup_data = training_rdd.take(warmup_iterations)
 		parameter_server = start_parameter_server(model=model, warmup_data=warmup_data)
-		raw_input('Press enter to continue\n')
+		#raw_input('Press enter to continue\n')
 
 		training_rdd = training_rdd.subtract(sc.parallelize(warmup_data))
 		train_epochs(num_epochs, training_rdd)
