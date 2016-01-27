@@ -39,7 +39,7 @@ class MolecularDNN(ParameterServerModel):
 		keep_prob = tf.Variable(0.5, name='keep_prob', trainable=False)
 		h_fc3_dropout = tf.nn.dropout(h_fc3, keep_prob)
 
-		guess_y = tf.matmul(h_fc3, W_fc4) + b_fc4
+#		guess_y = tf.matmul(h_fc3, W_fc4) + b_fc4
 		guess_y_dropout = tf.matmul(h_fc3_dropout, W_fc4) + b_fc4
 
 		variables = [W_fc1, b_fc1, W_fc2, b_fc2, W_fc3, b_fc3, W_fc4, b_fc4]
@@ -51,12 +51,12 @@ class MolecularDNN(ParameterServerModel):
 		compute_gradients = optimizer.compute_gradients(loss, variables)
 		apply_gradients = optimizer.apply_gradients(compute_gradients)
 		minimize = optimizer.minimize(loss)
-		correct_prediction = tf.equal(tf.clip_by_value(tf.round(guess_y), 0, 1), tf.clip_by_value(tf.round(true_y), 0, 1))
-		error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
+#		correct_prediction = tf.equal(tf.clip_by_value(tf.round(guess_y), 0, 1), tf.clip_by_value(tf.round(true_y), 0, 1))
+#		error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 	#		correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
 
 
-		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session)
+		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, loss, session)
 
 
     def process_warmup_data(self, data, batch_size=0):
@@ -70,7 +70,7 @@ class MolecularDNN(ParameterServerModel):
 	         continue
 	      split = line.split(',')
 	      features.append(split[:2871])
-	      labels.append(float(split[2871:2871+15]))
+	      labels.append(split[2871:2871+15])
 
 	   return labels, features
 
@@ -86,8 +86,8 @@ class MolecularDNN(ParameterServerModel):
 					print 'Skipping empty line'
 					continue
 				split = line.split(',')
-				features.append(split[:28])
-				labels.append(float(split[28]))
+				features.append(split[:2871])
+				labels.append(split[2871:2871+15])
 			except StopIteration:
 				break
 

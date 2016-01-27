@@ -25,10 +25,10 @@ class TensorSparkWorker():
    def __init__(self):
       #self.model = TensorSparkModel()
 #      self.model = mnistdnn.MnistDNN()
-      self.model = higgsdnn.HiggsDNN()
+#      
+      self.model = moleculardnn.MolecularDNN()
 #      self.model = model
       self.websock = websocket.create_connection('ws://localhost:55555')
-      self.minibatch_size = 50
       self.iteration = 0
 
    # def process_partition(self, partition, batch_size=0):

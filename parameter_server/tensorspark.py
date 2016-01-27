@@ -94,7 +94,7 @@ def train_epochs(num_epochs, training_rdd):
 		training_rdd.repartition(training_rdd.getNumPartitions())
 
 def test_all():
-	testing_rdd = sc.textFile(directory + "higgs/higgs_test_all.csv")
+	testing_rdd = sc.textFile(directory + "molecular/molecular_test_all.csv")
 	mapped_testing = testing_rdd.mapPartitions(test_partition)
 	return mapped_testing.reduce(add)/mapped_testing.getNumPartitions()
 
@@ -113,7 +113,8 @@ def start_parameter_server(model, warmup_data):
 ex = Experiment('tensorspark')
 ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
 #model = mnistdnn.MnistDNN()
-model = higgsdnn.HiggsDNN()
+#model = higgsdnn.HiggsDNN()
+model = moleculardnn.MolecularDNN()
 conf = pyspark.SparkConf().set("spark.python.profile", "true")
 sc = pyspark.SparkContext(conf=conf)
 
@@ -126,7 +127,7 @@ def configure_experiment():
 @ex.automain
 def main(warmup_iterations, num_epochs):
 	try:
-		training_rdd = sc.textFile(directory + "higgs/higgs_train_all.csv")
+		training_rdd = sc.textFile(directory + "molecular/molecular_train_all.csv")
 	#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
 		warmup_data = training_rdd.take(warmup_iterations)
 		parameter_server = start_parameter_server(model=model, warmup_data=warmup_data)
