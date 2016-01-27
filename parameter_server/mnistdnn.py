@@ -15,7 +15,8 @@ def bias_variable(shape, name):
 
 class MnistDNN(ParameterServerModel):
     def __init__(self):
-        session = tf.InteractiveSession()
+        NUM_CORES = 1
+        session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
         input_units = 784
         output_units = 10
         hidden_units = 1024
