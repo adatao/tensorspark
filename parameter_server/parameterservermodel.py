@@ -43,49 +43,56 @@ class ParameterServerModel():
       self.writer = tf.train.SummaryWriter("./logs", self.session.graph_def)
       self.session.run(tf.initialize_all_variables())
 
-   def compute_gradients_is_correct_type(self, compute_gradients):
-      if type(compute_gradients) != list:
-         return False
-      for element in compute_gradients:
-         if type(element) != tuple or len(element) != 2:
-            return False
-         if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.Variable:
-            return False
-      return True
+   # def compute_gradients_is_correct_type(self, compute_gradients):
+   #    if type(compute_gradients) != list:
+   #       return False
+   #    for element in compute_gradients:
+   #       if type(element) != tuple or len(element) != 2:
+   #          return False
+   #       if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.Variable:
+   #          return False
+   #    return True
 
    def get_num_classes(self):
       return self.y_.get_shape().as_list()[1]
 
    def train(self, labels, features):
-      feed_dict={self.x: features, self.y_: labels}
-      # this can probably be made more efficiently with tf.gradients or tf.add
-      self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
-      #summary = self.merged.eval(feed_dict=feed_dict)
-      error_rate = self.error_rate.eval(feed_dict=feed_dict)
-#      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
-      #accuracy = self.accuracy.eval(feed_dict=feed_dict)
-#      self.writer.add_summary(summary, self.num_gradients)
+      with self.session.as_default():
 
-      self.num_gradients += 1
-      return error_rate
+         feed_dict={self.x: features, self.y_: labels}
+         # this can probably be made more efficiently with tf.gradients or tf.add
+         self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
+         #summary = self.merged.eval(feed_dict=feed_dict)
+         error_rate = self.error_rate.eval(feed_dict=feed_dict)
+   #      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
+         #accuracy = self.accuracy.eval(feed_dict=feed_dict)
+   #      self.writer.add_summary(summary, self.num_gradients)
+
+         self.num_gradients += 1
+         return error_rate
 
    def test(self, labels, features):
-      feed_dict = {self.x: features, self.y_: labels}
-      test_error_rate = self.error_rate.eval(feed_dict=feed_dict)
-      print 'error_rate %s' % test_error_rate
-      return test_error_rate
+      with self.session.as_default():
+
+         feed_dict = {self.x: features, self.y_: labels}
+         test_error_rate = self.error_rate.eval(feed_dict=feed_dict)
+         print 'error_rate %s' % test_error_rate
+         return test_error_rate
 
    def get_parameters(self):
-      return [grad_var[1].eval(session=self.session) for grad_var in self.compute_gradients]
+      with self.session.as_default():
+         return [grad_var[1].eval(session=self.session) for grad_var in self.compute_gradients]
 
    def assign_parameters(self, parameters):
-      self.reset_gradients()
-      for i, grad_var in enumerate(self.compute_gradients):
-         gradient = grad_var[0]
-         parameter = parameters[i]
-         feed={gradient:parameter}
-         self.parameter_assignments[i].eval(feed_dict=feed)
-#         variable.assign(parameter).eval()
+      with self.session.as_default():
+
+         self.reset_gradients()
+         for i, grad_var in enumerate(self.compute_gradients):
+            gradient = grad_var[0]
+            parameter = parameters[i]
+            feed={gradient:parameter}
+            self.parameter_assignments[i].eval(feed_dict=feed)
+   #         variable.assign(parameter).eval()
 
    def apply(self, gradients):
       with self.graph.as_default():
@@ -99,11 +106,13 @@ class ParameterServerModel():
          print 'applied gradients'
 
    def get_gradients(self):
+#      with self.session.as_default():
       return [np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients] 
 
    def reset_gradients(self):
-      self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]
-      self.num_gradients = 0
+      with self.session.as_default():
+         self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]
+         self.num_gradients = 0
 
 
    def train_warmup(self, partition, batch_size=100): 

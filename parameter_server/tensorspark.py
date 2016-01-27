@@ -51,6 +51,8 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 			self.lock.release()
 			print 'applied gradient'
 		elif message['type'] == 'save_model':
+			if not os.path.exists('./models'):
+				os.makedirs('./models')
 			self.saver.save(self.model.session, './models/parameter_server_model', global_step=int(time.time()))
 		elif message['type'] == 'restore_model':
 			model_path = message['model_path']
@@ -110,7 +112,8 @@ ex = Experiment('tensorspark')
 ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
 model = mnistdnn.MnistDNN()
 #model = higgsdnn.HiggsDNN()
-sc = pyspark.SparkContext()
+conf = pyspark.SparkConf().set("spark.python.profile", "true")
+sc = pyspark.SparkContext(conf=conf)
 
 @ex.config
 def configure_experiment():
@@ -132,6 +135,9 @@ def main(warmup_iterations, num_epochs):
 		print 'Done training'
 		save_model()
 		print 'Testing now'
-		print test_all()
+		test_results test_all()
+		print test_results
+		sc.show_profiles()
+		return test_results
 	finally:
 		tornado.ioloop.IOLoop.current().stop()

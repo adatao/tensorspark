@@ -15,7 +15,10 @@ def bias_variable(shape, name):
 
 class MnistDNN(ParameterServerModel):
 	def __init__(self):
-		session = tf.InteractiveSession()
+		#session = tf.InteractiveSession()
+		NUM_CORES = 1
+		session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
+		#session.as_default().__enter__()
 		x = tf.placeholder("float", shape=[None, 784], name='x')
 		#x_image = tf.reshape(x, [-1,28,28,1], name='reshape')
 		true_y = tf.placeholder("float", shape=[None, 10], name='y_')
