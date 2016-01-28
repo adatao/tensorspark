@@ -26,6 +26,7 @@ class TensorSparkWorker():
    def __init__(self):
       self.model = mnistdnn.MnistDNN()      
 #      self.model = moleculardnn.MolecularDNN()
+#      self.model = higgsdnn.HiggsDNN()      
 #      self.websock = websocket.create_connection('ws://localhost:55555')
       IOLoop.current().run_sync(self.init_websocket)
       self.iteration = 0
@@ -54,7 +55,8 @@ class TensorSparkWorker():
          if self.time_to_push(self.iteration):
             self.push_gradients()
 
-      return accuracies
+    #  No need to return anything meaningful here as asynchronous anyway
+      return []
       #return [self.train(x) for x in partition]
 
    def test_partition(self, partition):

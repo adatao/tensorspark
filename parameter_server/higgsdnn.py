@@ -14,12 +14,12 @@ def bias_variable(shape):
 
 class HiggsDNN(ParameterServerModel):
     def __init__(self):
-        num_hidden_units = 2048
+        num_hidden_units = 512
         session = tf.InteractiveSession()
         input_units = 28
         output_units = 1
         x = tf.placeholder("float", shape=[None, input_units], name='x')
-        true_y = tf.placeholder("float", shape=[None, output_units], name='y_')
+        y_ = tf.placeholder("float", shape=[None, output_units], name='y_')
 
         W_fc1 = weight_variable([input_units, num_hidden_units])
         b_fc1 = bias_variable([num_hidden_units])
@@ -43,7 +43,7 @@ class HiggsDNN(ParameterServerModel):
         guess_y_dropout = tf.matmul(h_fc3_dropout, W_fc4) + b_fc4
 
         variables = [W_fc1, b_fc1, W_fc2, b_fc2, W_fc3, b_fc3, W_fc4, b_fc4]
-        loss = tf.nn.l2_loss(guess_y_dropout - true_y)
+        loss = tf.nn.l2_loss(guess_y_dropout - y_)
 
 #		optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
         optimizer = tf.train.AdamOptimizer(1e-4)
@@ -54,10 +54,10 @@ class HiggsDNN(ParameterServerModel):
  #       error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 #		correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
 
-        ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, loss, session)
+        ParameterServerModel.__init__(self, x, y_, compute_gradients, apply_gradients, minimize, loss, session)
 
 
-    def process_warmup_data(self, data, batch_size=0):
+    def process_data(self, data, batch_size=0):
         features = []
         labels = []
         if batch_size == 0:
@@ -71,7 +71,7 @@ class HiggsDNN(ParameterServerModel):
 	      labels.append([float(split[28])])
 
         return labels, features
-
+        
     def process_partition(self, partition, batch_size=0):
         features = []
         labels = []

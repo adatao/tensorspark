@@ -17,14 +17,16 @@ import pickle
 import time
 from sacred import Experiment
 from sacred.observers import MongoObserver
+import numpy as np
 
-directory = "/Users/christophersmith/code/adatao/tensorspark/data/"
-#directory = "/Users/ushnishde/Documents/TensorSpark/"
+#directory = "/Users/christophersmith/code/adatao/tensorspark/data/"
+directory = "/Users/ushnishde/Documents/TensorSpark/"
 
 class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 
 	def __init__(self, *args, **kwargs):
-		self.model = kwargs.pop('model')
+		self.server = kwargs.pop('server')
+		self.model = self.server.model
 		with self.model.session.graph.as_default():
 			self.saver = tf.train.Saver()
 		self.lock = threading.Lock()		
@@ -52,6 +54,9 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 			print 'received gradient'
 			self.lock.acquire()
 			self.model.apply(gradient)
+			error_rate = self.model.test(self.server.test_labels, self.server.test_features)      
+			with open('%serror_rates' % directory, 'a') as f:
+        			f.write(str(error_rate) + '\n')                  
 			self.lock.release()
 			print 'applied gradient'
 		elif message['type'] == 'save_model':
@@ -66,11 +71,14 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 
 class ParameterServer(threading.Thread):
 
-	def __init__(self, model, warmup_data=None):
+	def __init__(self, model, warmup_data=None, test_data=None):
 		threading.Thread.__init__(self)
 		self.model = model
+		test_labels, test_features = model.process_data(test_data)
+		self.test_features = test_features
+		self.test_labels = test_labels
 		self.warmup(warmup_data)
-		self.application = tornado.web.Application([(r"/", ParameterServerWebsocketHandler, {'model':model})])
+		self.application = tornado.web.Application([(r"/", ParameterServerWebsocketHandler, {'server':self})])
 
 	def warmup(self, data=None):
 		if data is not None:
@@ -106,8 +114,8 @@ def save_model():
 	websock.send(json.dumps(message))
 
 
-def start_parameter_server(model, warmup_data):
-	parameter_server = ParameterServer(model=model, warmup_data=warmup_data)
+def start_parameter_server(model, warmup_data, test_data):
+	parameter_server = ParameterServer(model=model, warmup_data=warmup_data, test_data=test_data)
 	parameter_server.start()
 	return parameter_server
 
@@ -133,7 +141,13 @@ def main(warmup_iterations, num_epochs):
 		training_rdd = sc.textFile('%smnist_train.csv' % directory)
 	#	training_rdd = sc.textFile('/Users/christophersmith/code/adatao/tensorspark/data/medium_mnist_train.csv')
 		warmup_data = training_rdd.take(warmup_iterations)
-		parameter_server = start_parameter_server(model=model, warmup_data=warmup_data)
+		with open('%smnist_test.csv' % directory) as test_file:
+        		test_data_lines = test_file.readlines()
+           
+		with open('%serror_rates' % directory, 'w') as f:
+        		f.write('')            
+		test_data = test_data_lines[0:1000]  
+		parameter_server = start_parameter_server(model=model, warmup_data=warmup_data, test_data=test_data)
 		#raw_input('Press enter to continue\n')
 
 		training_rdd = training_rdd.subtract(sc.parallelize(warmup_data))

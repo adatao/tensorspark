@@ -22,7 +22,7 @@ class MnistDNN(ParameterServerModel):
         hidden_units = 1024
         x = tf.placeholder("float", shape=[None, input_units], name='x')
 		#x_image = tf.reshape(x, [-1,28,28,1], name='reshape')
-        true_y = tf.placeholder("float", shape=[None, output_units], name='y_')
+        y_ = tf.placeholder("float", shape=[None, output_units], name='y_')
 
         W_fc0 = weight_variable([input_units, hidden_units], 'W_fc0')
         b_fc0 = bias_variable([hidden_units], 'b_fc0')
@@ -42,18 +42,18 @@ class MnistDNN(ParameterServerModel):
         guess_y_dropout = tf.matmul(h_fc1_dropout, W_fc2) + b_fc2
 
         variables = [W_fc0, b_fc0, W_fc1, b_fc1, W_fc2, b_fc2]
-        loss = tf.nn.softmax_cross_entropy_with_logits(guess_y_dropout, true_y)
+        loss = tf.nn.softmax_cross_entropy_with_logits(guess_y_dropout, y_)
 
         optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
         compute_gradients = optimizer.compute_gradients(loss, variables)
         apply_gradients = optimizer.apply_gradients(compute_gradients)
         minimize = optimizer.minimize(loss)
-        correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
+        correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(y_,1))
         error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session)
+        ParameterServerModel.__init__(self, x, y_, compute_gradients, apply_gradients, minimize, error_rate, session)
 
-    def process_warmup_data(self, data, batch_size=0):
+    def process_data(self, data, batch_size=0):
         num_classes = self.get_num_classes()
         features = []
         labels = []
@@ -74,7 +74,7 @@ class MnistDNN(ParameterServerModel):
             labels.append(label)
 
         return labels, features
-
+        
     def process_partition(self, partition, batch_size=0):
         num_classes = self.get_num_classes()
         features = []

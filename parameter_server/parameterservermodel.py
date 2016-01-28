@@ -63,13 +63,13 @@ class ParameterServerModel():
          # this can probably be made more efficiently with tf.gradients or tf.add
          self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
          #summary = self.merged.eval(feed_dict=feed_dict)
-         error_rate = self.error_rate.eval(feed_dict=feed_dict)
+   #      error_rate = self.error_rate.eval(feed_dict=feed_dict)
    #      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
          #accuracy = self.accuracy.eval(feed_dict=feed_dict)
    #      self.writer.add_summary(summary, self.num_gradients)
 
          self.num_gradients += 1
-         return error_rate
+   #      return error_rate
 
    def test(self, labels, features):
       with self.session.as_default():
@@ -120,7 +120,7 @@ class ParameterServerModel():
       iteration = 0
       for i in range(0, len(partition), batch_size):
          data = partition[i:i+batch_size]
-         labels, features = self.process_warmup_data(data, batch_size)
+         labels, features = self.process_data(data, batch_size)
          if len(labels) is 0:
             break
          with self.session.as_default():
@@ -134,7 +134,7 @@ class ParameterServerModel():
 
       return error_rates
 
-   def process_warmup_data(self, data, batch_size=0):
+   def process_data(self, data, batch_size=0):
       raise AssertionError('function not implemented')
 
    def process_partition(self, partition, batch_size=0):
