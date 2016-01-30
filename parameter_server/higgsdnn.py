@@ -1,4 +1,3 @@
-
 import tensorflow as tf
 from parameterservermodel import ParameterServerModel
 
@@ -10,16 +9,14 @@ def bias_variable(shape):
    initial = tf.constant(0.1, shape=shape)
    return tf.Variable(initial)
 
-
-
 class HiggsDNN(ParameterServerModel):
-    def __init__(self):
-        num_hidden_units = 512
+    def __init__(self, batch_size):
+        num_hidden_units = 2048
         session = tf.InteractiveSession()
         input_units = 28
         output_units = 1
         x = tf.placeholder("float", shape=[None, input_units], name='x')
-        y_ = tf.placeholder("float", shape=[None, output_units], name='y_')
+        true_y = tf.placeholder("float", shape=[None, output_units], name='y_')
 
         W_fc1 = weight_variable([input_units, num_hidden_units])
         b_fc1 = bias_variable([num_hidden_units])
@@ -43,52 +40,48 @@ class HiggsDNN(ParameterServerModel):
         guess_y_dropout = tf.matmul(h_fc3_dropout, W_fc4) + b_fc4
 
         variables = [W_fc1, b_fc1, W_fc2, b_fc2, W_fc3, b_fc3, W_fc4, b_fc4]
-        loss = tf.nn.l2_loss(guess_y_dropout - y_)
+        loss = tf.nn.l2_loss(guess_y_dropout - true_y)
 
-#		optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
-        optimizer = tf.train.AdamOptimizer(1e-4)
+        optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, beta1=0.99, beta2=0.999, epsilon=1e-06, use_locking=False, name='Adam')
+       # optimizer = tf.train.RMSPropOptimizer(1e-4, decay=0.9, momentum=0.0, epsilon=1e-10, use_locking=False, name='RMSProp')
         compute_gradients = optimizer.compute_gradients(loss, variables)
         apply_gradients = optimizer.apply_gradients(compute_gradients)
         minimize = optimizer.minimize(loss)
 #        correct_prediction = tf.equal(tf.clip_by_value(tf.round(guess_y), 0.0, 1.0), true_y)
  #       error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
-#		correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
+#               correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
 
-        ParameterServerModel.__init__(self, x, y_, compute_gradients, apply_gradients, minimize, loss, session)
-
-
-    def process_data(self, data, batch_size=0):
-        features = []
-        labels = []
-        if batch_size == 0:
-            batch_size = len(data)
-        for line in data:
-	      if len(line) is 0:
-	         print 'Skipping empty line'
-	         continue
-	      split = line.split(',')
-	      features.append(split[:28])
-	      labels.append([float(split[28])])
-
-        return labels, features
-        
-    def process_partition(self, partition, batch_size=0):
-        features = []
-        labels = []
-        if batch_size == 0:
-            batch_size = 1000000
-        for i in xrange(batch_size):
-            try:
-                line = partition.next()
-                if len(line) is 0:
-                    print 'Skipping empty line'
-                    continue
-                split = line.split(',')
-                features.append(split[:28])
-                labels.append([float(split[28])])
-            except StopIteration:
-                break
-
-        return labels, features
-
-
+        ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, loss, session,batch_size)                                                                                                                                                                                      
+                                                                                                                                                          
+    def process_data(self, data):                                                                                                                         
+        features = []                                                                                                                                     
+        labels = []                                                                                                                                       
+        for line in data:                                                                                                                                 
+              if len(line) is 0:                                                                                                                          
+                 print 'Skipping empty line'                                                                                                              
+                 continue                                                                                                                                 
+              split = line.split(',')                                                                                                                     
+              features.append(split[:-1])                                                                                                                 
+              labels.append([float(split[-1])])                                                                                                           
+                                                                                                                                                          
+        return labels, features                                                                                                                           
+                                                                                                                                                          
+    def process_partition(self, partition):                                                                                                               
+        batch_size = self.batch_size                                                                                                                      
+        features = []                                                                                                                                     
+        labels = []                                                                                                                                       
+        #if batch_size == 0:                                                                                                                              
+        #    batch_size = 1000000                                                                                                                         
+        for i in xrange(batch_size):                                                                                                                      
+            try:                                                                                                                                          
+                line = partition.next()                                                                                                                   
+                if len(line) is 0:                                                                                                                        
+                    print 'Skipping empty line'                                                                                                           
+                    continue                                                                                                                              
+                split = line.split(',')                                                                                                                   
+                features.append(split[:-1])                                                                                                               
+                labels.append([float(split[-1])])                                                                                                         
+            except StopIteration:                                                                                                                         
+                break                                                                                                                                     
+                                                                                                                                                          
+        return labels, features                                                                                                                           

@@ -1,5 +1,4 @@
 import tensorflow as tf
-import numpy as np
 from parameterservermodel import ParameterServerModel
 
 def weight_variable(shape, name):
@@ -14,15 +13,16 @@ def bias_variable(shape, name):
 # 6 layers, 1024, 512 neurons
 
 class MnistDNN(ParameterServerModel):
-    def __init__(self):
+    def __init__(self, batch_size):
         NUM_CORES = 1
+        self.batch_size = batch_size
         session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
         input_units = 784
         output_units = 10
         hidden_units = 1024
         x = tf.placeholder("float", shape=[None, input_units], name='x')
-		#x_image = tf.reshape(x, [-1,28,28,1], name='reshape')
-        y_ = tf.placeholder("float", shape=[None, output_units], name='y_')
+                #x_image = tf.reshape(x, [-1,28,28,1], name='reshape')
+        true_y = tf.placeholder("float", shape=[None, output_units], name='y_')
 
         W_fc0 = weight_variable([input_units, hidden_units], 'W_fc0')
         b_fc0 = bias_variable([hidden_units], 'b_fc0')
@@ -42,63 +42,66 @@ class MnistDNN(ParameterServerModel):
         guess_y_dropout = tf.matmul(h_fc1_dropout, W_fc2) + b_fc2
 
         variables = [W_fc0, b_fc0, W_fc1, b_fc1, W_fc2, b_fc2]
-        loss = tf.nn.softmax_cross_entropy_with_logits(guess_y_dropout, y_)
+        loss = tf.nn.softmax_cross_entropy_with_logits(guess_y_dropout, true_y)
 
         optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
         compute_gradients = optimizer.compute_gradients(loss, variables)
         apply_gradients = optimizer.apply_gradients(compute_gradients)
         minimize = optimizer.minimize(loss)
-        correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(y_,1))
+        correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
         error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        ParameterServerModel.__init__(self, x, y_, compute_gradients, apply_gradients, minimize, error_rate, session)
+        ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session, batch_size)
 
-    def process_data(self, data, batch_size=0):
-        num_classes = self.get_num_classes()
-        features = []
-        labels = []
-        if batch_size == 0:
-            batch_size = len(data)
-        for line in data:
-            if len(line) is 0:
-                print 'Skipping empty line'
-                continue
-            label = [0] * num_classes
-            split = line.split(',')
-            split[0] = int(split[0])
-            if split[0] >= num_classes:
-                print 'Error label out of range: %d' % split[0]
-                continue
-            features.append(split[1:])
-            label[split[0]] = 1
-            labels.append(label)
-
-        return labels, features
-        
-    def process_partition(self, partition, batch_size=0):
-        num_classes = self.get_num_classes()
-        features = []
-        labels = []
-        if batch_size == 0:
-            batch_size = 1000000
-        for i in xrange(batch_size):
-            try:
-                line = partition.next()
-                if len(line) is 0:
-                    print 'Skipping empty line'
-                    continue
-                label = [0] * num_classes
-                split = line.split(',')
-                split[0] = int(split[0])
-                if split[0] >= num_classes:
-                    print 'Error label out of range: %d' % split[0]
-                    continue
-                features.append(split[1:])
-                label[split[0]] = 1
-                labels.append(label)
-            except StopIteration:
-                break
-
-        return labels, features
-
-
+    def process_data(self, data):
+        batch_size = self.batch_size                                                                                                                      
+        num_classes = self.get_num_classes()                                                                                                              
+        features = []                                                                                                                                     
+        labels = []                                                                                                                                       
+        if batch_size == 0:                                                                                                                               
+            batch_size = len(data)                                                                                                                        
+        for line in data:                                                                                                                                 
+            if len(line) is 0:                                                                                                                            
+                print 'Skipping empty line'                                                                                                               
+                continue                                                                                                                                  
+            label = [0] * num_classes                                                                                                                     
+            split = line.split(',')                                                                                                                       
+            split[0] = int(split[0])                                                                                                                      
+            if split[0] >= num_classes:                                                                                                                   
+                print 'Error label out of range: %d' % split[0]                                                                                           
+                continue                                                                                                                                  
+            features.append(split[1:])                                                                                                                    
+            label[split[0]] = 1                                                                                                                           
+            labels.append(label)                                                                                                                          
+                                                                                                                                                          
+        return labels, features                                                                                                                           
+                                                                                                                                                          
+    def process_partition(self, partition):                                                                                                               
+        batch_size = self.batch_size                                                                                                                      
+        print 'batch_size = %d' % batch_size                                                                                                              
+        num_classes = self.get_num_classes()                                                                                                              
+        features = []                                                                                                                                     
+        labels = []                                                                                                                                       
+        if batch_size == 0:                                                                                                                               
+            batch_size = 1000000                                                                                                                          
+        for i in xrange(batch_size):                                                                                                                      
+            try:                                                                                                                                          
+                line = partition.next()                                                                                                                   
+                if len(line) is 0:                                                                                                                        
+                    print 'Skipping empty line'                                                                                                           
+                    continue                                                                                                                              
+                label = [0] * num_classes                                                                                                                 
+                split = line.split(',')                                                                                                                   
+                split[0] = int(split[0])                                                                                                                  
+                if split[0] >= num_classes:                                                                                                               
+                    print 'Error label out of range: %d' % split[0]                                                                                       
+                    continue                                                                                                                              
+                features.append(split[1:])                                                                                                                
+                label[split[0]] = 1                                                                                                                       
+                labels.append(label)                                                                                                                      
+            except StopIteration:                                                                                                                         
+                break                                                                                                                                     
+                                                                                                                                                          
+        return labels, features                                                                                                                           
+                                                                                                                                                          
+ 

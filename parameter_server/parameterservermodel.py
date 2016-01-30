@@ -1,9 +1,14 @@
 import tensorflow as tf
 import numpy as np
+import time
+import cStringIO
+import base64
+from memory_profiler import profile
+import sys
 
 class ParameterServerModel():
 
-   def __init__(self, x, y_, compute_gradients, apply_gradients, minimize, error_rate, session):
+   def __init__(self, x, y_, compute_gradients, apply_gradients, minimize, error_rate, session, batch_size):
 #       if type(x) != tf.python.framework.ops.Tensor:
 #          raise(TypeError('x must be of type tf.python.framework.ops.Tensor'))
 #       if type(y_) != tf.python.framework.ops.Tensor:
@@ -18,8 +23,8 @@ class ParameterServerModel():
 # #         raise(TypeError('optimizer must be of type tf.python.training.adam.AdamOptimizer'))
 #       if type(session) != tf.python.client.session.InteractiveSession:
 #          raise(TypeError('session must be of type tf.python.client.session.InteractiveSession'))
-
       self.session = session
+      self.batch_size = batch_size
       self.graph = session.graph
       self.session.graph.as_default().__enter__()
       self.x = x
@@ -39,8 +44,8 @@ class ParameterServerModel():
          self.parameter_assignments.append(variable.assign(gradient))
 
 
-      self.merged = tf.merge_all_summaries()
-      self.writer = tf.train.SummaryWriter("./logs", self.session.graph_def)
+#      self.merged = tf.merge_all_summaries()
+#      self.writer = tf.train.SummaryWriter("./logs", self.session.graph_def)
       self.session.run(tf.initialize_all_variables())
 
    # def compute_gradients_is_correct_type(self, compute_gradients):
@@ -49,147 +54,133 @@ class ParameterServerModel():
    #    for element in compute_gradients:
    #       if type(element) != tuple or len(element) != 2:
    #          return False
-   #       if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.Variable:
-   #          return False
-   #    return True
-
-   def get_num_classes(self):
-      return self.y_.get_shape().as_list()[1]
-
-   def train(self, labels, features):
-      with self.session.as_default():
-
-         feed_dict={self.x: features, self.y_: labels}
-         # this can probably be made more efficiently with tf.gradients or tf.add
-         self.gradients = np.add(self.gradients, [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients])
-         #summary = self.merged.eval(feed_dict=feed_dict)
-   #      error_rate = self.error_rate.eval(feed_dict=feed_dict)
-   #      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
-         #accuracy = self.accuracy.eval(feed_dict=feed_dict)
-   #      self.writer.add_summary(summary, self.num_gradients)
-
-         self.num_gradients += 1
-   #      return error_rate
-
-   def test(self, labels, features):
-      with self.session.as_default():
-
-         feed_dict = {self.x: features, self.y_: labels}
-         test_error_rate = self.error_rate.eval(feed_dict=feed_dict)
-         print 'error_rate %s' % test_error_rate
-         return test_error_rate
-
-   def get_parameters(self):
-      with self.session.as_default():
-         return [grad_var[1].eval(session=self.session) for grad_var in self.compute_gradients]
-
-   def assign_parameters(self, parameters):
-      with self.session.as_default():
-
-         self.reset_gradients()
-         for i, grad_var in enumerate(self.compute_gradients):
-            gradient = grad_var[0]
-            parameter = parameters[i]
-            feed={gradient:parameter}
-            self.parameter_assignments[i].eval(feed_dict=feed)
-   #         variable.assign(parameter).eval()
-
-   def apply(self, gradients):
-      with self.graph.as_default():
-         grads_and_vars = [(tf.convert_to_tensor(gradient), self.compute_gradients[i][1]) for i, gradient in enumerate(gradients)]
-         feed_dict = {}
-         for i, grad_var in enumerate(self.compute_gradients):
-            feed_dict[grad_var[0]] = gradients[i]
-
-
-         self.apply_gradients.run(session=self.session, feed_dict=feed_dict)
-         print 'applied gradients'
-
-   def get_gradients(self):
-#      with self.session.as_default():
-      return [np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients] 
-
-   def reset_gradients(self):
-      with self.session.as_default():
-         self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]
-         self.num_gradients = 0
-
-
-   def train_warmup(self, partition, batch_size=100): 
-      error_rates = []
-      iteration = 0
-      for i in range(0, len(partition), batch_size):
-         data = partition[i:i+batch_size]
-         labels, features = self.process_data(data, batch_size)
-         if len(labels) is 0:
-            break
-         with self.session.as_default():
-            #accuracy = self.train(labels, features)
-            feed = {self.x: features, self.y_: labels}
-            self.minimize.run(feed_dict = feed)
-            error_rate = self.error_rate.eval(feed_dict=feed)
-            error_rates.append(error_rate)
-            iteration += 1
-            print 'Warmup training iteration %d at %f error_rate' % (iteration, error_rate)
-
-      return error_rates
-
-   def process_data(self, data, batch_size=0):
-      raise AssertionError('function not implemented')
-
-   def process_partition(self, partition, batch_size=0):
-      raise AssertionError('function not implemented')
-
-
-# pulled this out of the class so we can do static vars via attaching properties to the function
-# def process_warmup_data(model, partition, batch_size=0):
-#    if 'next_index' not in process_warmup_data.__dict__:
-#       process_warmup_data.next_index = 0
-#    num_classes = model.get_num_classes()
-#    features = []
-#    labels = []
-#    if batch_size == 0:
-#       batch_size = len(partition)
-#    last_index = min(len(partition), process_warmup_data.next_index + batch_size)
-#    for i in range(process_warmup_data.next_index, last_index):
-#       line = partition[i]
-#       if len(line) is 0:
-#          print 'Skipping empty line'
-#          continue
-#       label = [0] * num_classes
-#       split = line.split(',')
-#       split[0] = int(split[0])
-#       if split[0] >= num_classes:
-#          print 'Error label out of range: %d' % split[0]
-#          continue
-#       features.append(split[1:])
-#       label[split[0]] = 1
-#       labels.append(label)
-
-#    process_warmup_data.next_index = last_index
-#    return labels, features
-
-# def xavier_init(n_inputs, n_outputs, uniform=True):
-#   """Set the parameter initialization using the method described.
-#   This method is designed to keep the scale of the gradients roughly the same
-#   in all layers.
-#   Xavier Glorot and Yoshua Bengio (2010):
-#            Understanding the difficulty of training deep feedforward neural
-#            networks. International conference on artificial intelligence and
-#            statistics.
-#   Args:
-#     n_inputs: The number of input nodes into each output.
-#     n_outputs: The number of output nodes for each input.
-#     uniform: If true use a uniform distribution, otherwise use a normal.
-#   Returns:
-#     An initializer.
-#   """
-#   if uniform:
-#     # 6 was used in the paper.
-#     init_range = math.sqrt(6.0 / (n_inputs + n_outputs))
-#     return tf.random_uniform_initializer(-init_range, init_range)
-#   else:
-#     # 3 gives us approximately the same limits as above since this repicks
-#     # values greater than 2 standard deviations from the mean.
-#     stddev = math.sqrt(3.0 / (n_inputs + n_outputs))
-#     return tf.truncated_normal_initializer(stddev=stddev)
+   #       if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.Variable:                                
+   #          return False                                                                                                                                
+   #    return True                                                                                                                                       
+                                                                                                                                                          
+   def get_num_classes(self):                                                                                                                             
+      return self.y_.get_shape().as_list()[1]                                                                                                             
+                                                                                                                                                          
+   def train(self, labels, features):                                                                                                                     
+      with self.session.as_default():                                                                                                                     
+                                                                                                                                                          
+         feed_dict={self.x: features, self.y_: labels}                                                                                                    
+         # this can probably be made more efficiently with tf.gradients or tf.add                                                                         
+         plus_this = [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients]                                                       
+         self.gradients = np.add(self.gradients, plus_this)                                                                                               
+         #summary = self.merged.eval(feed_dict=feed_dict)                                                                                                 
+         #error_rate = self.error_rate.eval(feed_dict=feed_dict)                                                                                          
+   #      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)                                                         
+         #accuracy = self.accuracy.eval(feed_dict=feed_dict)                                                                                              
+   #      self.writer.add_summary(summary, self.num_gradients)                                                                                            
+                                                                                                                                                          
+         self.num_gradients += 1                                                                                                                          
+         del feed_dict                                                                                                                                    
+         del plus_this                                                                                                                                    
+         #return error_rate                                                                                                                               
+                                                                                                                                                          
+   def test(self, labels, features):                                                                                                                      
+      with self.session.as_default():                                                                                                                     
+                                                                                                                                                          
+         feed_dict = {self.x: features, self.y_: labels}                                                                                                  
+         test_error_rate = self.error_rate.eval(feed_dict=feed_dict)                                                                                      
+         del feed_dict                                                                                                                                    
+         return test_error_rate                                                                                                                           
+                                                                                                                                                          
+   @profile(stream=sys.stdout)                                                                                                                            
+   def get_parameters(self):                                                                                                                              
+      with self.session.as_default():                                                                                                                     
+                                                                                                                                                          
+        return np.array([grad_var[1].eval(session=self.session) for grad_var in self.compute_gradients])                                                  
+                                                                                                                                                          
+   def assign_parameters(self, parameters):                                                                                                               
+      with self.session.as_default():                                                                                                                     
+                                                                                                                                                          
+         self.reset_gradients()                                                                                                                           
+         for i, grad_var in enumerate(self.compute_gradients):                                                                                            
+            self.parameter_assignments[i].eval(feed_dict={grad_var[0]:parameters[i]})                                                                     
+                                                                                                                                                          
+   @profile(stream=sys.stdout)                                                                                                                            
+   def apply(self, gradients):                                                                                                                            
+      with self.graph.as_default():                                                                                                                       
+         feed_dict = {}                                                                                                                                   
+         for i, grad_var in enumerate(self.compute_gradients):                                                                                            
+            feed_dict[grad_var[0]] = gradients[i]                                                                                                         
+         self.apply_gradients.run(session=self.session, feed_dict=feed_dict)                                                                              
+         del feed_dict                                                                                                                                    
+         del gradients                                                                                                                                    
+                                                                                                                                                          
+   @profile(stream=sys.stdout)                                                                                                                            
+   def get_gradients(self):                                                                                                                               
+#      with self.session.as_default():                                                                                                                    
+        l = [np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients]                                                     
+        n = np.array(l)                                                                                                                                   
+        del l                                                                                                                                             
+        return n                                                                                                                                          
+      #return np.array([np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients])                                         
+                                                                                                                                                          
+   def reset_gradients(self):                                                                                                                             
+      with self.session.as_default():                                                                                                                     
+         self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]                                                             
+         self.num_gradients = 0                                                                                                                           
+                                                                                                                                                          
+                                                                                                                                                          
+   def train_warmup(self, partition, error_rates_filename):                                                                                               
+      error_rates = []                                                                                                                                    
+      iteration = 0                                                                                                                                       
+      batch_size = self.batch_size                                                                                                                        
+      for i in range(0, len(partition), batch_size):                                                                                                      
+         data = partition[i:i+batch_size]                                                                                                                 
+         labels, features = self.process_data(data)                                                                                                       
+         if len(labels) is 0:                                                                                                                             
+            break                                                                                                                                         
+         with self.session.as_default():                                                                                                                  
+            #accuracy = self.train(labels, features)                                                                                                      
+            feed = {self.x: features, self.y_: labels}                                                                                                    
+            self.minimize.run(feed_dict = feed)                                                                                                           
+            error_rate = self.error_rate.eval(feed_dict=feed)                                                                                             
+            t = time.time()                                                                                                                               
+            with open(error_rates_filename, 'a') as f:                                                                                                    
+                f.write('%f , %f\n' % (t,error_rate))                                                                                                     
+            error_rates.append(error_rate)                                                                                                                
+            iteration += 1                                                                                                                                
+            print 'Warmup training iteration %d at %f error_rate' % (iteration, error_rate)                                                               
+                                                                                                                                                          
+      return error_rates                                                                                                                                  
+                                                                                                                                                          
+   def process_data(self, data):                                                                                                                          
+      raise AssertionError('function not implemented')                                                                                                    
+                                                                                                                                                          
+   def process_partition(self, partition):                                                                                                                
+      raise AssertionError('function not implemented')                                                                                                    
+                                                                                                                                                          
+   @profile(stream=sys.stdout)                                                                                                                            
+   def serialize(self, array):                                                                                                                            
+        #return json.dumps(thing)                                                                                                                         
+        memfile = cStringIO.StringIO()                                                                                                                    
+        np.savez_compressed(memfile,array=array)                                                                                                          
+        memfile.seek(0)                                                                                                                                   
+        readed = base64.urlsafe_b64encode(memfile.read())                                                                                                 
+        memfile.close()                                                                                                                                   
+        del memfile                                                                                                                                       
+        del array                                                                                                                                         
+        return readed                                                                                                                                     
+                                                                                                                                                          
+   @profile(stream=sys.stdout)                                                                                                                            
+   def deserialize(self, serialized):                                                                                                                     
+        #return json.loads(thing)                                                                                                                         
+        memfile = cStringIO.StringIO()                                                                                                                    
+        encoded = serialized.encode('utf-8')                                                                                                              
+        decoded = base64.urlsafe_b64decode(encoded)                                                                                                       
+        memfile.write(decoded)                                                                                                                            
+        #memfile.write(json.loads(this).encode('latin-1'))                                                                                                
+        memfile.seek(0)                                                                                                                                   
+        loaded = np.load(memfile)                                                                                                                         
+        array = loaded['array']                                                                                                                           
+        memfile.close()                                                                                                                                   
+        del memfile                                                                                                                                       
+        del encoded                                                                                                                                       
+        del decoded                                                                                                                                       
+        del serialized                                                                                                                                    
+        del loaded                                                                                                                                        
+        return array                                                                                                                                      
