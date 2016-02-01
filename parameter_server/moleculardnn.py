@@ -13,7 +13,7 @@ def bias_variable(shape):
 
 
 class MolecularDNN(ParameterServerModel):
-    def __init__(self):
+    def __init__(self, batch_size):
 		num_hidden_units = 2048
 		session = tf.InteractiveSession()
 		input_units = 2871
@@ -47,7 +47,7 @@ class MolecularDNN(ParameterServerModel):
 		loss = tf.nn.l2_loss(guess_y_dropout - true_y)
 
 	#		optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
-		optimizer = tf.train.RMSPropOptimizer(1e-4, decay=0.9, momentum=0.0, epsilon=1e-10, use_locking=False, name='RMSProp')
+		optimizer = tf.train.AdamOptimizer(learning_rate=0.00001, beta1=0.99, beta2=0.999, epsilon=1e-06, use_locking=False, name='Adam')
 		compute_gradients = optimizer.compute_gradients(loss, variables)
 		apply_gradients = optimizer.apply_gradients(compute_gradients)
 		minimize = optimizer.minimize(loss)
@@ -56,14 +56,12 @@ class MolecularDNN(ParameterServerModel):
 	#		correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
 
 
-		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, loss, session)
+		ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, loss, session, batch_size)
 
 
-    def process_warmup_data(self, data, batch_size=0):
+    def process_data(self, data):
 	   features = []
 	   labels = []
-	   if batch_size == 0:
-	      batch_size = len(data)
 	   for line in data:
 	      if len(line) is 0:
 	         print 'Skipping empty line'
@@ -74,7 +72,8 @@ class MolecularDNN(ParameterServerModel):
 
 	   return labels, features
 
-    def process_partition(self, partition, batch_size=0):
+    def process_partition(self, partition):
+		batch_size = self.batch_size
 		features = []
 		labels = []
 		if batch_size == 0:

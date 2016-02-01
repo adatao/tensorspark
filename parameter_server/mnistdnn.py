@@ -14,8 +14,9 @@ def bias_variable(shape, name):
 # 6 layers, 1024, 512 neurons
 
 class MnistDNN(ParameterServerModel):
-    def __init__(self):
+    def __init__(self, batch_size):
         NUM_CORES = 1
+	self.batch_size = batch_size
         session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
         input_units = 784
         output_units = 10
@@ -51,9 +52,11 @@ class MnistDNN(ParameterServerModel):
         correct_prediction = tf.equal(tf.argmax(guess_y,1), tf.argmax(true_y,1))
         error_rate = 1 - tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session)
+        ParameterServerModel.__init__(self, x, true_y, compute_gradients, apply_gradients, minimize, error_rate, session, batch_size)
 
-    def process_warmup_data(self, data, batch_size=0):
+    def process_data(self, data):
+	batch_size = self.batch_size
+	#batch_size = 100
         num_classes = self.get_num_classes()
         features = []
         labels = []
@@ -75,7 +78,10 @@ class MnistDNN(ParameterServerModel):
 
         return labels, features
 
-    def process_partition(self, partition, batch_size=0):
+    def process_partition(self, partition):
+	batch_size = self.batch_size
+	#batch_size = 100
+	print 'batch_size = %d' % batch_size
         num_classes = self.get_num_classes()
         features = []
         labels = []
