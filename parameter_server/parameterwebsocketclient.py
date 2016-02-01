@@ -1,17 +1,18 @@
 #!/usr/local/bin/bpython
 # -*- coding: utf-8 -*-
 import json
+import threading
 import tensorflow as tf
-import mnistdnn
-import higgsdnn
-import moleculardnn
-#import pickle
-import math
-import numpy as np
+
 import tornado.websocket
 from tornado import gen 
 from tornado.ioloop import IOLoop
 import cStringIO
+
+import mnistdnn
+import higgsdnn
+import moleculardnn
+
 # TODO
 # Imagenet
 # Tachyon
@@ -32,6 +33,7 @@ class TensorSparkWorker():
 	  raise
       IOLoop.current().run_sync(self.init_websocket)
       self.iteration = 0
+      self.lock = threading.Lock()
 
    @gen.coroutine
    def init_websocket(self):
@@ -48,7 +50,9 @@ class TensorSparkWorker():
          if self.time_to_pull(self.iteration):
 		self.request_parameters()
 
+         self.lock.acquire()
          self.model.train(labels, features)
+         self.lock.release()
          self.iteration += 1
 
          if self.time_to_push(self.iteration):
@@ -93,16 +97,21 @@ class TensorSparkWorker():
       parameters = self.model.deserialize(parameters)
       #parameters = pickle.loads(pickled_parameters)
       #print 'received parameters'
+      self.lock.acquire()
       self.model.assign_parameters(parameters)
+      self.lock.release()
 
    def push_gradients(self):
       IOLoop.current().run_sync(self.push_gradients_coroutine)
 
    @gen.coroutine
    def push_gradients_coroutine(self):
-      	#print 'pushing gradients'
-      	gradients = self.model.serialize(self.model.get_gradients())
-	gradient_update_message = {'type':'client_gives_gradient', 'gradient':gradients}
-      	self.websock.write_message(json.dumps(gradient_update_message))
-      	#print 'pushed gradients'      
+      # print 'pushing gradients'
+      self.lock.acquire()
+      grads = self.model.get_gradients()
+      self.lock.release()
+      gradients = self.model.serialize(grads)
+      gradient_update_message = {'type':'client_gives_gradient', 'gradient':gradients}
+      self.websock.write_message(json.dumps(gradient_update_message))
+      # print 'pushed gradients'
 
