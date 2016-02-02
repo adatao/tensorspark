@@ -1,5 +1,5 @@
 import tensorflow as tf
-#import download_mnist
+import download_mnist
 
 
 def weight_variable(shape, name):
@@ -17,7 +17,7 @@ def max_pool_2x2(x):
    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
                          strides=[1, 2, 2, 1], padding='SAME')
 
-#mnist = download_mnist.read_data_sets('MNIST_data', one_hot=True)
+mnist = download_mnist.read_data_sets('MNIST_data', one_hot=True)
 
 session = tf.InteractiveSession()
 x = tf.placeholder("float", shape=[None, 784], name='x')
@@ -39,27 +39,25 @@ keep_prob = tf.placeholder("float", name='keep_prob')
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 W_fc2 = weight_variable([1024, 10], 'W_fc2')
 b_fc2 = bias_variable([10], 'b_fc2')
+
 y_conv=tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
-#variables = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
-#loss = -tf.reduce_sum(y_ * tf.log(y_conv))
-#optimizer = tf.train.AdamOptimizer(1e-4)
-#correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
-#accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-#compute_gradients = optimizer.compute_gradients(loss)
-
 variables = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
-loss = -tf.reduce_sum(y_ * tf.log(y_conv))
+loss = tf.nn.softmax_cross_entropy_with_logits(y_conv, y_)
+#loss = -tf.reduce_sum(y_ * tf.log(y_conv))
 optimizer = tf.train.AdamOptimizer(1e-4)
-compute_gradients = optimizer.compute_gradients(loss, variables)
-cross_entropy = -tf.reduce_sum(y_*tf.log(y_conv))
-train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+#compute_gradients = optimizer.compute_gradients(loss, variables)
+minimize = optimizer.minimize(loss)
 correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 session.run(tf.initialize_all_variables())
-ops = session.graph.get_operations()
-for element in compute_gradients:
-   print type(element[0]), type(element[1]), element[1].name
+
+
+
+
+#ops = session.graph.get_operations()
+#for element in compute_gradients:
+#   print type(element[0]), type(element[1]), element[1].name
 #saver = tf.train.Saver()
 #saver.restore(session, './')
 
