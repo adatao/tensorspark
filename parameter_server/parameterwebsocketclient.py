@@ -12,31 +12,46 @@ import tornado.websocket
 from tornado import gen 
 from tornado.ioloop import IOLoop
 import cStringIO
+from memory_profiler import profile
+import sys
+
 # TODO
 # Imagenet
 # Tachyon
 # Xavier initialization
 
-class TensorSparkWorker():
+class Borg:
+    _shared_state = {}
+    def __init__(self):
+        self.__dict__ = self._shared_state
+
+
+class TensorSparkWorker(Borg):
 
    def __init__(self, model_keyword, batch_size, websocket_port):
-      self.batch_size = batch_size
-      self.websocket_port = websocket_port
-      if model_keyword == 'mnist':
-          self.model = mnistdnn.MnistDNN(batch_size)    
-      elif model_keyword == 'higgs':
-          self.model = higgsdnn.HiggsDNN(batch_size)  
-      elif model_keyword == 'molecular':
-          self.model = moleculardnn.MolecularDNN(batch_size)
-      else:
-	  raise
-      IOLoop.current().run_sync(self.init_websocket)
-      self.iteration = 0
+      Borg.__init__(self)
+      if 'model' not in self.__dict__:
+         print 'Creating new Borg worker'
+         if model_keyword == 'mnist':
+             self.model = mnistdnn.MnistDNN(batch_size)    
+         elif model_keyword == 'higgs':
+             self.model = higgsdnn.HiggsDNN(batch_size)  
+         elif model_keyword == 'molecular':
+             self.model = moleculardnn.MolecularDNN(batch_size)
+         else:
+            raise
+         self.batch_size = batch_size
+         self.websocket_port = websocket_port
+         self.loop = IOLoop.current()
+         self.loop.run_sync(self.init_websocket)
+         #self.lock = threading.Lock()
+         self.iteration = 0	
 
    @gen.coroutine
    def init_websocket(self):
-      self.websock = yield tornado.websocket.websocket_connect("ws://172.31.3.244:%d/" % self.websocket_port)
+      self.websock = yield tornado.websocket.websocket_connect("ws://localhost:%d/" % self.websocket_port)
 
+   @profile(stream = sys.stdout)
    def train_partition(self, partition): 
       while True:
          #print 'TensorSparkWorker().train_partition iteration %d' % self.iteration

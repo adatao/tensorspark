@@ -81,7 +81,6 @@ class MnistDNN(ParameterServerModel):
     def process_partition(self, partition):
 	batch_size = self.batch_size
 	#batch_size = 100
-	print 'batch_size = %d' % batch_size
         num_classes = self.get_num_classes()
         features = []
         labels = []
