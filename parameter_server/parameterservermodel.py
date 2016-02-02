@@ -4,8 +4,10 @@ import time
 import json
 import cStringIO
 import base64
-#from memory_profiler import profile
-#import sys
+from memory_profiler import profile
+import sys
+from guppy import hpy
+hp = hpy()
 
 class ParameterServerModel():
 
@@ -44,41 +46,27 @@ class ParameterServerModel():
          variable = grad_var[1]
          self.parameter_assignments.append(variable.assign(gradient))
 
-
-#      self.merged = tf.merge_all_summaries()
-#      self.writer = tf.train.SummaryWriter("./logs", self.session.graph_def)
       self.session.run(tf.initialize_all_variables())
-
-   # def compute_gradients_is_correct_type(self, compute_gradients):
-   #    if type(compute_gradients) != list:
-   #       return False
-   #    for element in compute_gradients:
-   #       if type(element) != tuple or len(element) != 2:
-   #          return False
-   #       if type(element[0]) != tf.python.framework.ops.Tensor or type(element[1]) != tf.python.ops.tensorflow.Variable:
-   #          return False
-   #    return True
 
    def get_num_classes(self):
       return self.y_.get_shape().as_list()[1]
 
    def train(self, labels, features):
+
       with self.session.as_default():
 
          feed_dict={self.x: features, self.y_: labels}
          # this can probably be made more efficiently with tf.gradients or tf.add
          plus_this = [grad_var[0].eval(feed_dict=feed_dict) for grad_var in self.compute_gradients]
-	 self.gradients = np.add(self.gradients, plus_this)
-         #summary = self.merged.eval(feed_dict=feed_dict)
-         #error_rate = self.error_rate.eval(feed_dict=feed_dict)
-   #      summary, accuracy = self.session.run([self.merged, self.accuracy], feed_dict=feed_dict)
-         #accuracy = self.accuracy.eval(feed_dict=feed_dict)
-   #      self.writer.add_summary(summary, self.num_gradients)
+#         self.gradients = np.add(self.gradients, plus_this)
+         self.gradients += plus_this
 
          self.num_gradients += 1
-	 del feed_dict
-	 del plus_this
+         feed_dict.clear()
+         del plus_this[:]
+#         del plus_this[:]
          #return error_rate
+
 
    def test(self, labels, features):
       with self.session.as_default():
@@ -98,33 +86,43 @@ class ParameterServerModel():
       with self.session.as_default():
 
          self.reset_gradients()
+#         for i in xrange(len(self.compute_gradients)):
+#            feed = {self.compute_gradients[i][0]: parameters[i]}
          for i, grad_var in enumerate(self.compute_gradients):
-            self.parameter_assignments[i].eval(feed_dict={grad_var[0]:parameters[i]})
+            feed = {grad_var[0]:parameters[i]}
+            self.parameter_assignments[i].eval(feed_dict=feed)
+            feed.clear()
+
 	    	
-   #@profile(stream=sys.stdout)
    def apply(self, gradients):
       with self.graph.as_default():
          feed_dict = {}
          for i, grad_var in enumerate(self.compute_gradients):
             feed_dict[grad_var[0]] = gradients[i]
 
-
          self.apply_gradients.run(session=self.session, feed_dict=feed_dict)
-	 del feed_dict
-	 del gradients
+         feed_dict.clear()
 
-   #@profile(stream=sys.stdout)
+#         delete_recursively(gradients)
+
    def get_gradients(self):
 #      with self.session.as_default():
-	l = [np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients]
-	n = np.array(l)
-	del l
-	return n
-      #return np.array([np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients])
+      l = [np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients]
+      n = np.array(l)
+      del l
+      return n
+   #return np.array([np.divide(gradient,self.num_gradients).astype('float32') for gradient in self.gradients])
 
    def reset_gradients(self):
+
       with self.session.as_default():
-         self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]
+         try:
+            del self.gradients[:]
+         except AttributeError:
+            pass
+
+#         self.gradients = [tf.zeros(g[1].get_shape()).eval() for g in self.compute_gradients]
+         self.gradients = [np.zeros(g[1].get_shape()) for g in self.compute_gradients]
          self.num_gradients = 0
 
 
@@ -156,34 +154,34 @@ class ParameterServerModel():
 
    def process_partition(self, partition):
       raise AssertionError('function not implemented')
-   
+      
    #@profile(stream=sys.stdout)
    def serialize(self, array):
-	#return json.dumps(thing)
-	memfile = cStringIO.StringIO()
-	np.savez_compressed(memfile,array=array)
-	memfile.seek(0)
-	readed = base64.urlsafe_b64encode(memfile.read())
-	memfile.close()
-	del memfile
-	del array
-	return readed
-   
+      #return json.dumps(thing)
+      memfile = cStringIO.StringIO()
+      np.savez_compressed(memfile,array=array)
+      memfile.seek(0)
+      readed = base64.urlsafe_b64encode(memfile.read())
+      memfile.close()
+      del memfile
+      del array
+      return readed
+
    #@profile(stream=sys.stdout)
    def deserialize(self, serialized):
-	#return json.loads(thing)
-	memfile = cStringIO.StringIO()
-	encoded = serialized.encode('utf-8')
-	decoded = base64.urlsafe_b64decode(encoded)
-	memfile.write(decoded)
-	#memfile.write(json.loads(this).encode('latin-1'))
-	memfile.seek(0)
-	loaded = np.load(memfile)
-	array = loaded['array']
-	memfile.close()
-	del memfile
-	del encoded
-	del decoded
-	del serialized
-	del loaded
-	return array
+      #return json.loads(thing)
+      memfile = cStringIO.StringIO()
+      encoded = serialized.encode('utf-8')
+      decoded = base64.urlsafe_b64decode(encoded)
+      memfile.write(decoded)
+      #memfile.write(json.loads(this).encode('latin-1'))
+      memfile.seek(0)
+      loaded = np.load(memfile)
+      array = loaded['array']
+      memfile.close()
+      del memfile
+      del encoded
+      del decoded
+      del serialized
+      del loaded
+      return array

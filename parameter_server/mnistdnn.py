@@ -1,6 +1,9 @@
 import tensorflow as tf
 import numpy as np
 from parameterservermodel import ParameterServerModel
+from memory_profiler import profile
+import sys
+
 
 def weight_variable(shape, name):
    initial = tf.truncated_normal(shape, stddev=0.1)
@@ -79,9 +82,7 @@ class MnistDNN(ParameterServerModel):
         return labels, features
 
     def process_partition(self, partition):
-	batch_size = self.batch_size
-	#batch_size = 100
-	print 'batch_size = %d' % batch_size
+        batch_size = self.batch_size
         num_classes = self.get_num_classes()
         features = []
         labels = []
@@ -102,6 +103,7 @@ class MnistDNN(ParameterServerModel):
                 features.append(split[1:])
                 label[split[0]] = 1
                 labels.append(label)
+
             except StopIteration:
                 break
 

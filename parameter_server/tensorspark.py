@@ -20,21 +20,23 @@ from sacred.observers import MongoObserver
 import random
 import cStringIO
 import numpy as np 
-#from memory_profiler import profile
-#import sys
+from guppy import hpy
+hp = hpy()
+from memory_profiler import profile
+import sys
 
-directory = "/user/root/"
+directory = "/Users/christophersmith/code/adatao/tensorspark/data/"
 
 ex = Experiment('tensorspark')
 ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
 
 batch_sz = 100
-model_keyword = 'higgs'
+model_keyword = 'mnist'
 
 if model_keyword == 'mnist':
     training_rdd_filename = '%smnist_train.csv' % directory
     test_filename = '%smnist_test.csv' % directory  
-    local_test_path = '/home/ubuntu/mnist_test.csv'
+    local_test_path = '%smnist_test.csv' % directory
     model = mnistdnn.MnistDNN(batch_sz)
 elif model_keyword == 'higgs':
     training_rdd_filename = '%shiggs_train_all.csv' % directory
@@ -52,7 +54,7 @@ else:
     sys.exit(1)
 
 t = int(time.time())
-error_rates_path = '/home/ubuntu/error_rates_%s_%d.txt' % (model_keyword, t)
+error_rates_path = '/Users/christophersmith/code/adatao/tensorspark/parameter_server/error_rates_%s_%d.txt' % (model_keyword, t)
 conf = pyspark.SparkConf()
 #conf.setMaster('yarn')
 #conf.set('spark.driver.memory', '14g')
@@ -81,8 +83,8 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 		pass	
 #	print "Client disconnected"
 #	@profile(stream=sys.stdout)
-#	@profile
 	def on_message(self, message):
+
 		message = json.loads(message)
 	#	print 'received message %s' % message['type']
 		if message['type'] == 'client_requests_parameters':
@@ -118,6 +120,7 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
 		else:
 			print 'Unknown message type %s' % message['type']
 		del message
+
 
 
 class ParameterServer(threading.Thread):
@@ -181,7 +184,7 @@ def start_parameter_server(model, warmup_data,test_data):
 
 @ex.config
 def configure_experiment():
-	warmup_iterations = 20000
+	warmup_iterations = 2000
 	num_epochs = 5
 	batch_size = batch_sz
 	num_partitions = 96
