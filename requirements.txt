@@ -1,4 +1,2 @@
 tornado==4.3
 numpy==1.10.4
-pymongo==3.2
-sacred==0.6.9
