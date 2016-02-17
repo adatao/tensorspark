@@ -14,9 +14,9 @@ def bias_variable(shape):
 class MolecularDNN(ParameterServerModel):
     def __init__(self, batch_size):
                 num_hidden_units = 2048
-                NUM_CORES = 4
-                session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
-
+#                NUM_CORES = 4
+#                session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
+		session = tf.InteractiveSession()
                 #session = tf.InteractiveSession()
                 input_units = 2871
                 output_units = 15

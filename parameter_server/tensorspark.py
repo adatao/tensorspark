@@ -1,22 +1,16 @@
 import parameterwebsocketclient
 import pyspark
 from operator import add
-#import websocket
-import json
 import threading
 import tornado.web
 import tornado.ioloop
 import tornado.websocket
-#import mnistcnn
 import os
 import mnistdnn
 import higgsdnn
 import moleculardnn
 import tensorflow as tf
-#import pickle
 import time
-from sacred import Experiment
-from sacred.observers import MongoObserver
 import random
 import cStringIO
 import numpy as np
@@ -25,23 +19,17 @@ import numpy as np
 
 directory = "/user/root/"
 
-ex = Experiment('tensorspark')
-#ex.observers.append(MongoObserver.create(db_name='tensorspark_experiments'))
-
-batch_sz = 50
-model_keyword = 'mnist'
-warmup = 2000
-partitions = 1000
-time_lag = 100
-epochs = 3
-repartition = True
+model_keyword = 'higgs'
 if model_keyword == 'mnist':
     training_rdd_filename = '%smnist_train.csv' % directory
     test_filename = '%smnist_test.csv' % directory
     local_test_path = '/home/ubuntu/mnist_test.csv'
     partitions = 48
+    warmup = 2000
+    batch_sz = 50
     epochs = 5
     repartition = True
+    time_lag = 100
     model = mnistdnn.MnistDNN(batch_sz)
 elif model_keyword == 'higgs':
     training_rdd_filename = '%shiggs_train_all.csv' % directory
@@ -60,7 +48,9 @@ elif model_keyword == 'molecular':
     local_test_path = '/home/ubuntu/molecular_test_all.csv'                                                                                                                
     warmup = 10000                                                                                                                                                         
     repartition = True                                                                                                                                                     
-    batch_sz = 30                                                                                                                                                          
+    epochs = 3
+    partitions = 128
+    batch_sz = 64                                                                                                                                                      
     time_lag = 130                                                                                                                                                         
     model = moleculardnn.MolecularDNN(batch_sz)                                                                                                                            
 else:                                                                                                                                                                      
@@ -76,7 +66,12 @@ conf = pyspark.SparkConf()
 #conf.set('spark.driver.maxResultSize', '14g')                                                                                                                             
 #conf.set('spark.yarn.am.memory', '10g')                                                                                                                                   
 #conf.set('yarn.nodemanager.resource.memory-mb', '2000')                                                                                                                   
+conf.setExecutorEnv('LD_LIBRARY_PATH', ':/usr/local/cuda-7.0/lib64')
+conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/local/cuda-7.0/bin') 
+conf.setExecutorEnv('HADOOP_CONF_DIR', '/usr/local/hadoop/etc/hadoop')
+conf.setExecutorEnv('JAVA_HOME','/usr/lib/jvm/java-7-openjdk-amd64')
 sc = pyspark.SparkContext(conf=conf)                                                                                                                                       
+
 websocket_port = random.randint(30000, 60000)                                                                                                                              
 print 'websocket_port %d' % websocket_port                                                                                                                                 
 class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):                                                                                                 
@@ -98,20 +93,16 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
                 self.lock.release()                                                                                                                                        
                 serialized = self.model.serialize(parameters)                                                                                                              
                 self.write_message(serialized, binary=True)                                                                                                                
-#               print "New client connected"                                                                                                                               
                                                                                                                                                                            
         def on_close(self):                                                                                                                                                
                 pass                                                                                                                                                       
-#       print "Client disconnected"                                                                                                                                        
-#       @profile(stream=sys.stdout)                                                                                                                                        
-#       @profile                                                                                                                                                           
                                                                                                                                                                            
                                                                                                                                                                            
         def on_message(self, message):                                                                                                                                     
                 # now assuming every message is a gradient                                                                                                                 
                 time_gradient = self.model.deserialize(message)                                                                                                            
                 self.server.gradient_count += 1                                                                                                                            
-                 print 'gradient_count %d' % self.server.gradient_count                                                                                                     
+                print 'gradient_count %d' % self.server.gradient_count                                                                                                     
                 time_sent = time_gradient[0][0]                                                                                                                            
                 #print(time.time() - time_sent)                                                                                                                            
                 if time.time() - time_sent < time_lag:                                                                                                                     
@@ -131,7 +122,7 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
                 del time_gradient                                                                                                                                          
                 self.send_parameters()                                                                                                                                     
                                                                                                                                                                            
- class ParameterServer(threading.Thread):                                                                                                                                   
+class ParameterServer(threading.Thread):                                                                                                                                   
                                                                                                                                                                            
         def __init__(self, model, warmup_data=None, test_data=None):                                                                                                       
                 threading.Thread.__init__(self)                                                                                                                            
@@ -159,7 +150,6 @@ def test_partition(partition):
         return parameterwebsocketclient.TensorSparkWorker(model_keyword, batch_sz, websocket_port).test_partition(partition)                                               
                                                                                                                                                                            
 # you can find the mnist csv files here http://pjreddie.com/projects/mnist-in-csv/                                                                                         
-@ex.capture                                                                                                                                                                
 def train_epochs(num_epochs, training_rdd, num_partitions):                                                                                                                
         for i in range(num_epochs):                                                                                                                                        
                 print 'training epoch %d' % i                                                                                                                              
@@ -178,12 +168,6 @@ def test_all():
         return mapped_testing.reduce(add)/mapped_testing.getNumPartitions()                                                                                                
                                                                                                                                                                            
                                                                                                                                                                            
-#       return mapped_testing.reduce(add)/mapped_testing.getNumPartitions()                                                                                                
-                                                                                                                                                                           
-def save_model():                                                                                                                                                          
-        websock = websocket.create_connection('ws://localhost:%d' % websocket_port)                                                                                        
-        message = {'type': 'save_model'}                                                                                                                                   
-        websock.send(json.dumps(message))                                                                                                                                  
                                                                                                                                                                            
                                                                                                                                                                            
 def start_parameter_server(model, warmup_data,test_data):                                                                                                                  
@@ -192,20 +176,10 @@ def start_parameter_server(model, warmup_data,test_data):
         return parameter_server                                                                                                                                            
                                                                                                                                                                            
                                                                                                                                                                            
-@ex.config                                                                                                                                                                 
-def configure_experiment():                                                                                                                                                
-        warmup_iterations = warmup                                                                                                                                         
-        num_epochs = epochs                                                                                                                                                
-        batch_size = batch_sz                                                                                                                                              
-        num_partitions = partitions                                                                                                                                        
-                                                                                                                                                                           
-                                                                                                                                                                           
-@ex.capture                                                                                                                                                                
-@ex.automain                                                                                                                                                               
-def main(warmup_iterations, num_epochs):                                                                                                                                   
+def main(warmup_iterations, num_epochs, num_partitions):                                                                                                                                   
         try:                                                                                                                                                               
-                training_rdd = sc.textFile(training_rdd_filename).cache()                                                                                                  
-                print(training_rdd.getNumPartitions())                                                                                                                     
+                training_rdd = sc.textFile(training_rdd_filename, minPartitions=num_partitions).cache()                                                                                                  
+                print 'num_partitions = %s' % training_rdd.getNumPartitions()                          
                 time.sleep(5)                                                                                                                                              
                                                                                                                                                                            
                 warmup_data = training_rdd.take(warmup_iterations)                                                                                                         
@@ -221,19 +195,18 @@ def main(warmup_iterations, num_epochs):
                 #raw_input('Press enter to continue\n')                                                                                                                    
                                                                                                                                                                            
                 #training_rdd = training_rdd.subtract(sc.parallelize(warmup_data))                                                                                         
-                train_epochs(num_epochs, training_rdd)                                                                                                                     
-#               print 'Done training'                                                                                                                                      
+                train_epochs(num_epochs, training_rdd, num_partitions)                                                                                                                     
 #               save_model()                                                                                                                                               
-#               print 'Testing now'                                                                                                                                        
-                test_results = test_all()                                                                                                                                  
-#               print test_results                                                                                                                                         
+#                test_results = test_all()                                                                                                                                  
 #               sc.show_profiles()                                                                                                                                         
-                t = time.time()                                                                                                                                            
-                with open(error_rates_path, 'a') as f:                                                                                                                     
-                        f.write('%f , %f\ndone' % (t, test_results))                                                                                                       
-                print test_results                                                                                                                                         
+#                t = time.time()                                                                                                                                            
+#                with open(error_rates_path, 'a') as f:                                                                                                                     
+#                        f.write('%f , %f\ndone' % (t, test_results))                                                                                                       
+#                print test_results                                                                                                                                         
                 print 'done'                                                                                                                                               
-                return test_results                                                                                                                                        
+#                return test_results                                                                                                                                        
         finally:                                                                                                                                                           
                 tornado.ioloop.IOLoop.current().stop()                                                                                                                     
+
+main(warmup_iterations=warmup, num_epochs=epochs, num_partitions=partitions)
  

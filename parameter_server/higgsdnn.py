@@ -19,11 +19,11 @@ def xavier_init(shape):
 class HiggsDNN(ParameterServerModel):
     def __init__(self, batch_size):
 
-        NUM_CORES = 4
-        session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
+#        NUM_CORES = 4
+#        session = tf.Session(config=tf.ConfigProto(inter_op_parallelism_threads=NUM_CORES, intra_op_parallelism_threads=NUM_CORES))
 
         num_hidden_units = 2048
-#        session = tf.InteractiveSession()
+        session = tf.InteractiveSession()
         input_units = 28
         output_units = 1
         x = tf.placeholder("float", shape=[None, input_units], name='x')

@@ -1,21 +1,20 @@
 #!/usr/local/bin/bpython
 # -*- coding: utf-8 -*-
-import json
 import tensorflow as tf
 import mnistdnn
 import higgsdnn
 import moleculardnn
-#import pickle
 import math
 import numpy as np
 import tornado.websocket
 from tornado import gen
 from tornado.ioloop import IOLoop
 import cStringIO
+
 # TODO
 # Imagenet
 # Tachyon
-# Xavier initialization
+
 
 class Borg:
     _shared_state = {}
@@ -31,7 +30,7 @@ class TensorSparkWorker(Borg):
       if 'model' not in self.__dict__:
          print 'Creating new Borg worker'
          if model_keyword == 'mnist':
-             self.model = mnistdnn.MnistDNN(batch_size)
+             self.model = mnistdnn.MnistDNN(batch_size, gpu=True)
          elif model_keyword == 'higgs':
              self.model = higgsdnn.HiggsDNN(batch_size)
          elif model_keyword == 'molecular':
@@ -46,7 +45,8 @@ class TensorSparkWorker(Borg):
 
    @gen.coroutine                                                                                                                                                          
    def init_websocket(self):                                                                                                                                               
-      self.websock = yield tornado.websocket.websocket_connect("ws://172.31.0.213:%d/" % self.websocket_port, connect_timeout=3600)                                        
+#      self.websock = yield tornado.websocket.websocket_connect("ws://localhost:%d/" % self.websocket_port, connect_timeout=3600)                                        
+      self.websock = yield tornado.websocket.websocket_connect("ws://172.31.0.92:%d/" % self.websocket_port, connect_timeout=3600)                                        
                                                                                                                                                                            
    def train_partition(self, partition):                                                                                                                                   
       while True:                                                                                                                                                          
