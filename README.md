@@ -1,4 +1,7 @@
-A repo for the Spark-Summit East project, TensorFlow on Spark
+A repo for Distributed TensorFlow on Spark, first presented at the 2016 Spark Summit East 
+
+Slide deck: http://www.slideshare.net/arimoinc/distributed-tensorflow-scaling-googles-deep-learning-library-on-spark-58527889
+Video of talk will be posted when available.
 
 Project layout:
 
