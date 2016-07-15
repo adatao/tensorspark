@@ -2,6 +2,9 @@
 data/*
 .DS_Store
 
+# Python packaging files
+*egg-info*
+
 # IntelliJ IDEA files
 *.iml
 .idea/
