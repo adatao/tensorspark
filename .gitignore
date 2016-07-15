@@ -1,3 +1,7 @@
 *.pyc
 data/*
 .DS_Store
+
+# IntelliJ IDEA files
+*.iml
+.idea/
