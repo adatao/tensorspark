@@ -32,11 +32,17 @@ directory = "hdfs:///data/ml/tensorspark/"
 local_directory = "/hadoopfs/fs1/python/tests/tensorspark/" # path in datanodes
 
 
-model_keyword = 'higgs'
+model_keyword = 'mnist'
 if model_keyword == 'mnist':
     training_rdd_filename = '%smnist_train.csv' % directory
-    test_filename = '%smnist_test.csv' % directory
-    local_test_path = '/home/ubuntu/mnist_test.csv'
+
+    #test_filename = '%smnist_test.csv' % directory
+    #test_filename = '%stiny_mnist_test.csv' % directory
+
+    #mod (adding test_path to read the testset from the HDFS instead)
+    #local_test_path = '%smnist_test.csv' % directory
+    test_path = '%smnist_test.csv' % directory
+
     partitions = 48
     warmup = 2000
     batch_sz = 50
@@ -46,8 +52,10 @@ if model_keyword == 'mnist':
     model = mnistdnn.MnistDNN(batch_sz)
 elif model_keyword == 'higgs':
     training_rdd_filename = '%shiggs_train_all.csv' % directory
-    test_filename = '%shiggs_test_all.csv' % directory
-    local_test_path = '/home/ubuntu/higgs_test_all.csv'
+    #test_filename = '%shiggs_test_all.csv' % directory
+    #local_test_path = '%shiggs_test_all.csv' % local_directory
+    test_path = '%shiggs_test_all.csv' % directory
+
     warmup = 20000
     epochs = 1
     partitions = 64
@@ -57,8 +65,10 @@ elif model_keyword == 'higgs':
     model = higgsdnn.HiggsDNN(batch_sz)
 elif model_keyword == 'molecular':
     training_rdd_filename = '%smolecular_train_all.csv' % directory                                                                                                        
-    test_filename = '%smolecular_test_all.csv' % directory                                                                                                                 
-    local_test_path = '/home/ubuntu/molecular_test_all.csv'                                                                                                                
+    #test_filename = '%smolecular_test_all.csv' % directory                                                                                                                 
+    #local_test_path = '%smolecular_test_all.csv' % local_directory                                                                                                                
+    test_path = '%smolecular_test_all.csv' % directory                                                                                                                
+
     warmup = 10000                                                                                                                                                         
     repartition = True                                                                                                                                                     
     epochs = 3
