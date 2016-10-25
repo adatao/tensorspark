@@ -28,7 +28,9 @@ training_iterations = 2500 #(needs to be more than the value set for warmup whic
 isWritingErrorLogOnLocaldisk = False
 # (set the same flag in parameterservermodel.py)
 
-directory = "/user/root/"
+directory = "hdfs:///data/ml/tensorspark/"
+local_directory = "/hadoopfs/fs1/python/tests/tensorspark/" # path in datanodes
+
 
 model_keyword = 'higgs'
 if model_keyword == 'mnist':
@@ -72,7 +74,7 @@ if driverLowLoadExecution == True:
     warmup = batch_sz
                                                                                                                                                                            
 t = int(time.time())                                                                                                                                                       
-error_rates_path = '/home/ubuntu/error_rates_%s_%d.txt' % (model_keyword, t)                                                                                               
+error_rates_path = '%serror_rates_%s_%d.txt' % (local_directory, model_keyword, t)                                                                                               
 conf = pyspark.SparkConf()                                                                                                                                                 
 #conf.setMaster('yarn')                                                                                                                                                    
 #conf.set('spark.driver.memory', '14g')                                                                                                                                    
