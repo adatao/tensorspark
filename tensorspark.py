@@ -240,6 +240,7 @@ def main(warmup_iterations, num_epochs, num_partitions):
                 parameter_server = start_parameter_server(model=model, warmup_data=warmup_data, test_data=test_data)                                                       
                 #raw_input('Press enter to continue\n')                                                                                                                    
                                                                                                                                                                            
+                print 'Training continues to the Executor(s)'                                                                                                                                           
                 #training_rdd = training_rdd.subtract(sc.parallelize(warmup_data))                                                                                         
                 train_epochs(num_epochs, training_rdd, num_partitions)                                                                                                                     
 #               save_model()                                                                                                                                               
