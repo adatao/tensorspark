@@ -20,6 +20,10 @@ import numpy as np
 #mod (In this mode (if True), the Driver only trains with batch_sz, then hands over the training to the executor(s))
 driverLowLoadExecution = False
 
+#mod (allowing limited training in each epoch)
+isTrainingLimited = False
+training_iterations = 2500 #(needs to be more than the value set for warmup which is used as warmup_iterations)
+
 directory = "/user/root/"
 
 model_keyword = 'higgs'
@@ -184,7 +188,12 @@ def start_parameter_server(model, warmup_data,test_data):
                                                                                                                                                                            
 def main(warmup_iterations, num_epochs, num_partitions):                                                                                                                                   
         try:                                                                                                                                                               
-                training_rdd = sc.textFile(training_rdd_filename, minPartitions=num_partitions).cache()                                                                                                  
+                #mod (allowing limited training in each epoch) [setting values on top]
+                if isTrainingLimited == False:                                                                                                                                                 
+                    training_rdd = sc.textFile(training_rdd_filename, minPartitions=num_partitions).cache()
+                else:
+                    training_rdd = sc.parallelize(sc.textFile(training_rdd_filename, minPartitions=num_partitions).take(training_iterations)).cache()
+
                 print 'num_partitions = %s' % training_rdd.getNumPartitions()                          
                 time.sleep(5)                                                                                                                                              
                                                                                                                                                                            
