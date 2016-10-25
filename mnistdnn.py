@@ -66,7 +66,8 @@ class MnistDNN(ParameterServerModel):
         if batch_size == 0:                                                                                                                                                
             batch_size = len(data)                                                                                                                                         
         for line in data:                                                                                                                                                  
-            if len(line) is 0:                                                                                                                                             
+            #if len(line) is 0:                                                                                                                                             
+            if len(line) < 2:  #mod (Fixing a dataset parsing error)                                                                                                                                          
                 print 'Skipping empty line'                                                                                                                                
                 continue                                                                                                                                                   
             label = [0] * num_classes                                                                                                                                      
