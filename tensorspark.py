@@ -92,10 +92,15 @@ conf = pyspark.SparkConf()
 #conf.set('spark.driver.maxResultSize', '14g')                                                                                                                             
 #conf.set('spark.yarn.am.memory', '10g')                                                                                                                                   
 #conf.set('yarn.nodemanager.resource.memory-mb', '2000')                                                                                                                   
-conf.setExecutorEnv('LD_LIBRARY_PATH', ':/usr/local/cuda-7.0/lib64')
-conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/local/cuda-7.0/bin') 
-conf.setExecutorEnv('HADOOP_CONF_DIR', '/usr/local/hadoop/etc/hadoop')
-conf.setExecutorEnv('JAVA_HOME','/usr/lib/jvm/java-7-openjdk-amd64')
+
+# Some of these are already defined in /etc/spark/conf/spark-env.sh
+#conf.setExecutorEnv('LD_LIBRARY_PATH', ':/usr/local/cuda-7.0/lib64')
+#conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/local/cuda-7.0/bin') 
+conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/hdp/current/hadoop-client/bin') 
+#conf.setExecutorEnv('HADOOP_CONF_DIR', '/usr/local/hadoop/etc/hadoop')
+#conf.setExecutorEnv('JAVA_HOME','/usr/lib/jvm/java-7-openjdk-amd64')
+
+
 sc = pyspark.SparkContext(conf=conf)                                                                                                                                       
 
 websocket_port = random.randint(30000, 60000)                                                                                                                              
