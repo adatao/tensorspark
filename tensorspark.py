@@ -24,6 +24,10 @@ driverLowLoadExecution = False
 isTrainingLimited = False
 training_iterations = 2500 #(needs to be more than the value set for warmup which is used as warmup_iterations)
 
+#mod (by default, the error log is not written on local disk where the Driver is running)
+isWritingErrorLogOnLocaldisk = False
+# (set the same flag in parameterservermodel.py)
+
 directory = "/user/root/"
 
 model_keyword = 'higgs'
@@ -123,8 +127,11 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
                                error_rate = self.model.test(self.server.test_labels, self.server.test_features)                                                            
                                print 'gradients received: %d    error_rate: %f' % (self.server.gradient_count, error_rate)                                                 
                                t = time.time()                                                                                                                             
-                               with open(error_rates_path, 'a') as f:                                                                                                      
-                                       f.write('%f, %d, %f\n' % (t, self.server.gradient_count, error_rate))                                                               
+                               #mod:
+                               if isWritingErrorLogOnLocaldisk == True:                                                                                                                            
+                                   with open(error_rates_path, 'a') as f:                                                                                                      
+                                           f.write('%f, %d, %f\n' % (t, self.server.gradient_count, error_rate))                                                               
+
                                                                                                                                                                            
                         self.lock.release()                                                                                                                                
                 else:                                                                                                                                                      
@@ -202,8 +209,11 @@ def main(warmup_iterations, num_epochs, num_partitions):
                 with open(local_test_path) as test_file:                                                                                                                   
                         test_data_lines = test_file.readlines()                                                                                                            
                                                                                                                                                                            
-                with open(error_rates_path, 'w') as f:                                                                                                                     
+                #mod:
+                if isWritingErrorLogOnLocaldisk == True:
+                    with open(error_rates_path, 'w') as f:                                                                                                                     
                         f.write('')                                                                                                                                        
+
                 test_data = test_data_lines[0:100]                                                                                                                         
                                                                                                                                                                            
                 parameter_server = start_parameter_server(model=model, warmup_data=warmup_data, test_data=test_data)                                                       
