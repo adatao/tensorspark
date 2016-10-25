@@ -228,13 +228,15 @@ def main(warmup_iterations, num_epochs, num_partitions):
                 #with open(local_test_path) as test_file:                                                                                                                   
                 #        test_data_lines = test_file.readlines() 
                                                                                                                                                                            
+                #mod (using all the testset for calculating the error):
+                #test_data = test_data_lines[0:100]                                                                                                                         
+                test_data = test_data_lines                                                                                                                         
+
                 #mod:
                 if isWritingErrorLogOnLocaldisk == True:
                     with open(error_rates_path, 'w') as f:                                                                                                                     
                         f.write('')                                                                                                                                        
 
-                test_data = test_data_lines[0:100]                                                                                                                         
-                                                                                                                                                                           
                 parameter_server = start_parameter_server(model=model, warmup_data=warmup_data, test_data=test_data)                                                       
                 #raw_input('Press enter to continue\n')                                                                                                                    
                                                                                                                                                                            
