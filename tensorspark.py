@@ -223,8 +223,10 @@ def main(warmup_iterations, num_epochs, num_partitions):
                                                                                                                                                                            
                 warmup_data = training_rdd.take(warmup_iterations)                                                                                                         
                                                                                                                                                                            
-                with open(local_test_path) as test_file:                                                                                                                   
-                        test_data_lines = test_file.readlines()                                                                                                            
+                #mod (reading the testset from the HDFS instead):
+                test_data_lines = sc.textFile(test_path).collect()
+                #with open(local_test_path) as test_file:                                                                                                                   
+                #        test_data_lines = test_file.readlines() 
                                                                                                                                                                            
                 #mod:
                 if isWritingErrorLogOnLocaldisk == True:
