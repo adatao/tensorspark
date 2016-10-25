@@ -17,8 +17,8 @@ import numpy as np
 #from memory_profiler import profile
 #import sys
 
-#mod (In this mode (if True), the Driver only trains with batch_sz, then hands over the training to the executor(s))
-driverLowLoadExecution = False
+#mod (in this mode, we have one executer only; the Driver only trains with batch_sz, then hands over the training to the 1 executor)
+driverLowLoadExecution = True
 
 directory = "/user/root/"
 
