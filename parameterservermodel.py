@@ -7,6 +7,10 @@ import base64
 #from memory_profiler import profile
 #import sys
 
+#mod (by default, the error log is not written on local disk where the Driver is running)
+isWritingErrorLogOnLocaldisk = False
+# (set the same flag in tensorspark.py)
+
 class ParameterServerModel():
 
    def __init__(self, x, y_, compute_gradients, apply_gradients, minimize, error_rate, session, batch_size):
@@ -121,8 +125,10 @@ class ParameterServerModel():
             self.minimize.run(feed_dict = feed)                                                                                                                            
             error_rate = self.error_rate.eval(feed_dict=feed)                                                                                                              
             t = time.time()                                                                                                                                                
-            with open(error_rates_filename, 'a') as f:                                                                                                                     
-                f.write('%f , %f\n' % (t,error_rate))                                                                                                                      
+            #mod:            
+            if isWritingErrorLogOnLocaldisk == True:                                                                                                                                                
+                with open(error_rates_filename, 'a') as f:                                                                                                                     
+                    f.write('%f , %f\n' % (t,error_rate))                                                                                                                      
             error_rates.append(error_rate)                                                                                                                                 
             iteration += 1                                                                                                                                                 
             print 'Warmup training iteration %d at %f error_rate' % (iteration, error_rate)                                                                                

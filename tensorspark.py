@@ -17,13 +17,32 @@ import numpy as np
 #from memory_profiler import profile
 #import sys
 
-directory = "/user/root/"
+#mod (In this mode (if True), the Driver only trains with batch_sz, then hands over the training to the executor(s))
+driverLowLoadExecution = False
 
-model_keyword = 'higgs'
+#mod (allowing limited training in each epoch)
+isTrainingLimited = False
+training_iterations = 2500 #(needs to be more than the value set for warmup which is used as warmup_iterations)
+
+#mod (by default, the error log is not written on local disk where the Driver is running)
+isWritingErrorLogOnLocaldisk = False
+# (set the same flag in parameterservermodel.py)
+
+directory = "hdfs:///data/ml/tensorspark/"
+local_directory = "/hadoopfs/fs1/python/tests/tensorspark/" # path in datanodes
+
+
+model_keyword = 'mnist'
 if model_keyword == 'mnist':
     training_rdd_filename = '%smnist_train.csv' % directory
-    test_filename = '%smnist_test.csv' % directory
-    local_test_path = '/home/ubuntu/mnist_test.csv'
+
+    #test_filename = '%smnist_test.csv' % directory
+    #test_filename = '%stiny_mnist_test.csv' % directory
+
+    #mod (adding test_path to read the testset from the HDFS instead)
+    #local_test_path = '%smnist_test.csv' % directory
+    test_path = '%smnist_test.csv' % directory
+
     partitions = 48
     warmup = 2000
     batch_sz = 50
@@ -33,8 +52,10 @@ if model_keyword == 'mnist':
     model = mnistdnn.MnistDNN(batch_sz)
 elif model_keyword == 'higgs':
     training_rdd_filename = '%shiggs_train_all.csv' % directory
-    test_filename = '%shiggs_test_all.csv' % directory
-    local_test_path = '/home/ubuntu/higgs_test_all.csv'
+    #test_filename = '%shiggs_test_all.csv' % directory
+    #local_test_path = '%shiggs_test_all.csv' % local_directory
+    test_path = '%shiggs_test_all.csv' % directory
+
     warmup = 20000
     epochs = 1
     partitions = 64
@@ -44,8 +65,10 @@ elif model_keyword == 'higgs':
     model = higgsdnn.HiggsDNN(batch_sz)
 elif model_keyword == 'molecular':
     training_rdd_filename = '%smolecular_train_all.csv' % directory                                                                                                        
-    test_filename = '%smolecular_test_all.csv' % directory                                                                                                                 
-    local_test_path = '/home/ubuntu/molecular_test_all.csv'                                                                                                                
+    #test_filename = '%smolecular_test_all.csv' % directory                                                                                                                 
+    #local_test_path = '%smolecular_test_all.csv' % local_directory                                                                                                                
+    test_path = '%smolecular_test_all.csv' % directory                                                                                                                
+
     warmup = 10000                                                                                                                                                         
     repartition = True                                                                                                                                                     
     epochs = 3
@@ -56,9 +79,12 @@ elif model_keyword == 'molecular':
 else:                                                                                                                                                                      
     print("KEYWORD HAS TO BE 'mnist', 'higgs' or 'molecular'")                                                                                                             
     sys.exit(1)                                                                                                                                                            
+#mod (related to the above driverLowLoadExecution flag)
+if driverLowLoadExecution == True:
+    warmup = batch_sz
                                                                                                                                                                            
 t = int(time.time())                                                                                                                                                       
-error_rates_path = '/home/ubuntu/error_rates_%s_%d.txt' % (model_keyword, t)                                                                                               
+error_rates_path = '%serror_rates_%s_%d.txt' % (local_directory, model_keyword, t)                                                                                               
 conf = pyspark.SparkConf()                                                                                                                                                 
 #conf.setMaster('yarn')                                                                                                                                                    
 #conf.set('spark.driver.memory', '14g')                                                                                                                                    
@@ -66,10 +92,15 @@ conf = pyspark.SparkConf()
 #conf.set('spark.driver.maxResultSize', '14g')                                                                                                                             
 #conf.set('spark.yarn.am.memory', '10g')                                                                                                                                   
 #conf.set('yarn.nodemanager.resource.memory-mb', '2000')                                                                                                                   
-conf.setExecutorEnv('LD_LIBRARY_PATH', ':/usr/local/cuda-7.0/lib64')
-conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/local/cuda-7.0/bin') 
-conf.setExecutorEnv('HADOOP_CONF_DIR', '/usr/local/hadoop/etc/hadoop')
-conf.setExecutorEnv('JAVA_HOME','/usr/lib/jvm/java-7-openjdk-amd64')
+
+# Some of these are already defined in /etc/spark/conf/spark-env.sh
+#conf.setExecutorEnv('LD_LIBRARY_PATH', ':/usr/local/cuda-7.0/lib64')
+#conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/local/cuda-7.0/bin') 
+conf.setExecutorEnv('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/hadoop/bin:/usr/hdp/current/hadoop-client/bin') 
+#conf.setExecutorEnv('HADOOP_CONF_DIR', '/usr/local/hadoop/etc/hadoop')
+#conf.setExecutorEnv('JAVA_HOME','/usr/lib/jvm/java-7-openjdk-amd64')
+
+
 sc = pyspark.SparkContext(conf=conf)                                                                                                                                       
 
 websocket_port = random.randint(30000, 60000)                                                                                                                              
@@ -113,8 +144,11 @@ class ParameterServerWebsocketHandler(tornado.websocket.WebSocketHandler):
                                error_rate = self.model.test(self.server.test_labels, self.server.test_features)                                                            
                                print 'gradients received: %d    error_rate: %f' % (self.server.gradient_count, error_rate)                                                 
                                t = time.time()                                                                                                                             
-                               with open(error_rates_path, 'a') as f:                                                                                                      
-                                       f.write('%f, %d, %f\n' % (t, self.server.gradient_count, error_rate))                                                               
+                               #mod:
+                               if isWritingErrorLogOnLocaldisk == True:                                                                                                                            
+                                   with open(error_rates_path, 'a') as f:                                                                                                      
+                                           f.write('%f, %d, %f\n' % (t, self.server.gradient_count, error_rate))                                                               
+
                                                                                                                                                                            
                         self.lock.release()                                                                                                                                
                 else:                                                                                                                                                      
@@ -178,22 +212,35 @@ def start_parameter_server(model, warmup_data,test_data):
                                                                                                                                                                            
 def main(warmup_iterations, num_epochs, num_partitions):                                                                                                                                   
         try:                                                                                                                                                               
-                training_rdd = sc.textFile(training_rdd_filename, minPartitions=num_partitions).cache()                                                                                                  
+                #mod (allowing limited training in each epoch) [setting values on top]
+                if isTrainingLimited == False:                                                                                                                                                 
+                    training_rdd = sc.textFile(training_rdd_filename, minPartitions=num_partitions).cache()
+                else:
+                    training_rdd = sc.parallelize(sc.textFile(training_rdd_filename, minPartitions=num_partitions).take(training_iterations)).cache()
+
                 print 'num_partitions = %s' % training_rdd.getNumPartitions()                          
                 time.sleep(5)                                                                                                                                              
                                                                                                                                                                            
                 warmup_data = training_rdd.take(warmup_iterations)                                                                                                         
                                                                                                                                                                            
-                with open(local_test_path) as test_file:                                                                                                                   
-                        test_data_lines = test_file.readlines()                                                                                                            
+                #mod (reading the testset from the HDFS instead):
+                test_data_lines = sc.textFile(test_path).collect()
+                #with open(local_test_path) as test_file:                                                                                                                   
+                #        test_data_lines = test_file.readlines() 
                                                                                                                                                                            
-                with open(error_rates_path, 'w') as f:                                                                                                                     
+                #mod (using all the testset for calculating the error):
+                #test_data = test_data_lines[0:100]                                                                                                                         
+                test_data = test_data_lines                                                                                                                         
+
+                #mod:
+                if isWritingErrorLogOnLocaldisk == True:
+                    with open(error_rates_path, 'w') as f:                                                                                                                     
                         f.write('')                                                                                                                                        
-                test_data = test_data_lines[0:100]                                                                                                                         
-                                                                                                                                                                           
+
                 parameter_server = start_parameter_server(model=model, warmup_data=warmup_data, test_data=test_data)                                                       
                 #raw_input('Press enter to continue\n')                                                                                                                    
                                                                                                                                                                            
+                print 'Training continues to the Executor(s)'                                                                                                                                           
                 #training_rdd = training_rdd.subtract(sc.parallelize(warmup_data))                                                                                         
                 train_epochs(num_epochs, training_rdd, num_partitions)                                                                                                                     
 #               save_model()                                                                                                                                               

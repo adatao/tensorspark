@@ -11,6 +11,8 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 import cStringIO
 
+#mod (we need to find out the IP address of the param server if using the YARN-Cluster mode; see below)
+isUsingYARNclusterMode = False
 # TODO
 # Imagenet
 # Tachyon
@@ -45,8 +47,40 @@ class TensorSparkWorker(Borg):
 
    @gen.coroutine                                                                                                                                                          
    def init_websocket(self):                                                                                                                                               
-#      self.websock = yield tornado.websocket.websocket_connect("ws://localhost:%d/" % self.websocket_port, connect_timeout=3600)                                        
-      self.websock = yield tornado.websocket.websocket_connect("ws://172.31.0.92:%d/" % self.websocket_port, connect_timeout=3600)                                        
+#mod
+      if isUsingYARNclusterMode == False:
+          self.websock = yield tornado.websocket.websocket_connect("ws://localhost:%d/" % self.websocket_port, connect_timeout=3600)                                        
+          #self.websock = yield tornado.websocket.websocket_connect("ws://172.31.0.92:%d/" % self.websocket_port, connect_timeout=3600)                                        
+
+      #We do not know in advance Spark driver is running on which node with the YARN/Cluster mode
+      else:
+          import time 
+          import urllib2
+          nodes= ({'hostname1':'10.0.0.0',
+                   'hostname2':'10.0.0.1',...})
+          YARN_app_queue = 'default'
+          YARN_address = 'http://YARN IP:8088'
+        
+          YARN_app_startedTimeBegin = str(int(time.time() - 3600)) # We allow 3,600 sec from start of the app up to this point
+        
+          requestedURL = (YARN_address + 
+                          '/ws/v1/cluster/apps?states=RUNNING&applicationTypes=SPARK&limit=1' + 
+                          '&queue=' + YARN_app_queue + 
+                          '&startedTimeBegin=' + YARN_app_startedTimeBegin)
+          print 'Sent request to YARN: ' + requestedURL
+          response = urllib2.urlopen(requestedURL)
+          html = response.read()
+          amHost_start = html.find('amHostHttpAddress') + len('amHostHttpAddress":"')
+          amHost_length = len('hostname1')
+          amHost = html[amHost_start : amHost_start + amHost_length]
+          print 'amHostHttpAddress is: ' + amHost
+          try:
+              self.websock = yield tornado.websocket.websocket_connect("ws://%s:%d/" % (nodes[amHost], self.websocket_port), connect_timeout=3600)
+              print 'Connected to server running on %s' % nodes[amHost]        
+          except:
+              print 'Could not connect to server on %s' % nodes[amHost]        
+#mod: end
+
                                                                                                                                                                            
    def train_partition(self, partition):                                                                                                                                   
       while True:                                                                                                                                                          
